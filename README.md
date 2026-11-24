@@ -91,32 +91,32 @@ na Fase 1 como novos consumidores do mesmo evento.
 
 Público, sem login:
 
-| Rota | O que faz |
-| --- | --- |
-| `GET /v1/stores/:slug/menu` | Cardápio da loja |
-| `POST /v1/stores/:slug/orders` | Cria o pedido (exige `Idempotency-Key`) |
-| `GET /v1/stores/:slug/orders/:id` | Acompanhamento do pedido pelo cliente |
+| Rota                              | O que faz                               |
+| --------------------------------- | --------------------------------------- |
+| `GET /v1/stores/:slug/menu`       | Cardápio da loja                        |
+| `POST /v1/stores/:slug/orders`    | Cria o pedido (exige `Idempotency-Key`) |
+| `GET /v1/stores/:slug/orders/:id` | Acompanhamento do pedido pelo cliente   |
 
 Conta:
 
-| Rota | O que faz |
-| --- | --- |
-| `POST /v1/auth/signup` | Cria a conta e o restaurante, e já abre a sessão |
-| `POST /v1/auth/login`, `POST /v1/auth/logout` | Abre e encerra a sessão |
-| `GET /v1/auth/me` | Usuário e restaurantes a que tem acesso |
+| Rota                                          | O que faz                                        |
+| --------------------------------------------- | ------------------------------------------------ |
+| `POST /v1/auth/signup`                        | Cria a conta e o restaurante, e já abre a sessão |
+| `POST /v1/auth/login`, `POST /v1/auth/logout` | Abre e encerra a sessão                          |
+| `GET /v1/auth/me`                             | Usuário e restaurantes a que tem acesso          |
 
 Painel do restaurante, em `/v1/panel/stores/:slug` (exige sessão e vínculo com a loja):
 
-| Rota | O que faz | Quem |
-| --- | --- | --- |
-| `GET /menu` | Cardápio completo, com itens desativados | todos |
-| `PATCH /` | Nome da loja e taxa de entrega | dono, gerente |
-| `POST /categories`, `PATCH /categories/:id` | Categorias | dono, gerente |
-| `POST /products`, `PATCH /products/:id` | Produtos | dono, gerente |
-| `PUT /products/:id/option-groups` | Substitui os grupos de opções do produto | dono, gerente |
-| `GET /orders?scope=open\|recent` | Pedidos em andamento ou encerrados nas últimas 24 h | todos |
-| `POST /orders/:id/status` | Avança ou cancela o pedido | todos |
-| `POST /realtime-token` | Token de 60 s para a conexão de tempo real | todos |
+| Rota                                        | O que faz                                           | Quem          |
+| ------------------------------------------- | --------------------------------------------------- | ------------- |
+| `GET /menu`                                 | Cardápio completo, com itens desativados            | todos         |
+| `PATCH /`                                   | Nome da loja e taxa de entrega                      | dono, gerente |
+| `POST /categories`, `PATCH /categories/:id` | Categorias                                          | dono, gerente |
+| `POST /products`, `PATCH /products/:id`     | Produtos                                            | dono, gerente |
+| `PUT /products/:id/option-groups`           | Substitui os grupos de opções do produto            | dono, gerente |
+| `GET /orders?scope=open\|recent`            | Pedidos em andamento ou encerrados nas últimas 24 h | todos         |
+| `POST /orders/:id/status`                   | Avança ou cancela o pedido                          | todos         |
+| `POST /realtime-token`                      | Token de 60 s para a conexão de tempo real          | todos         |
 
 Estados do pedido: `pending` → `confirmed` → `preparing` → `ready` → `completed`. Pedido de entrega passa por
 `out_for_delivery` antes de concluir. Qualquer estado em aberto pode ir para `cancelled`.
