@@ -1,0 +1,2 @@
+"onefood_app" "dev_app"
+"onefood_relay" "dev_relay"
