@@ -60,6 +60,20 @@ pnpm dev:web
 
 Outros comandos: `pnpm test` (precisa dos serviços no ar), `pnpm lint`, `pnpm format`, `pnpm typecheck`.
 
+Testes de ponta a ponta, num navegador de verdade (precisam dos serviços no ar e de `pnpm build`):
+
+```bash
+pnpm --filter @onefood/e2e exec playwright install chromium
+```
+
+```bash
+pnpm test:e2e
+```
+
+Eles sobem sozinhos a API, os workers, o tempo real e o site em portas próprias (3210 a 3212) e percorrem os
+fluxos como uma pessoa faria: cadastro e montagem do cardápio, pedido do cliente até a conclusão no painel,
+e acesso ao painel. Cada teste cria a própria loja.
+
 ## Estrutura
 
 ```
@@ -68,6 +82,7 @@ apps/api        Backend: um código, três processos (API, workers, tempo real)
   src/modules     Módulos de negócio: identity, catalog, orders, outbox, realtime
   test            Testes de integração contra Postgres, PgBouncer e Redis de verdade
 apps/web        Next.js: cardápio com carrinho, acompanhamento do pedido e painel do restaurante
+apps/e2e        Testes de ponta a ponta das telas (Playwright)
 packages/shared Tipos e validações compartilhados entre backend e web; dinheiro em centavos
 db/migrations   Migrações SQL, aplicadas em ordem por `pnpm db:migrate`
 infra/pgbouncer PgBouncer em modo transação, igual ao de produção
@@ -201,8 +216,6 @@ O teste só vale como critério quando roda contra o ambiente de homologação, 
 
 - **Infraestrutura como código e deploy.** Dependem da escolha do provedor de nuvem, que o plano deixa em
   cotação. A imagem do backend (`Dockerfile`) já serve aos três processos e às migrações.
-- **Testes automatizados das telas.** O fluxo foi conferido num navegador de verdade, mas ainda não há teste
-  de ponta a ponta no CI. O backend tem.
 - **Confirmação de e-mail, recuperação de senha e convite de equipe.** Dependem de um provedor de e-mail.
   Os papéis gerente e funcionário já existem no banco, mas só o dono é criado pelo cadastro.
 - **Dois fatores para donos.** Previsto no plano, ainda não implementado.

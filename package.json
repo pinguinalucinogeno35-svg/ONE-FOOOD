@@ -11,6 +11,7 @@
     "lint": "biome check .",
     "format": "biome check --write .",
     "test": "pnpm -r test",
+    "test:e2e": "pnpm --filter @onefood/e2e test:e2e",
     "services:up": "docker compose up -d --wait",
     "services:down": "docker compose down",
     "db:migrate": "pnpm --filter @onefood/api db:migrate",
