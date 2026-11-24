@@ -179,6 +179,35 @@ describe('painel de pedidos', () => {
     expect((await list('tudo')).statusCode).toBe(400);
   });
 
+  it('registra a primeira impressão do pedido, uma vez só', async () => {
+    const order = await place();
+    const find = async () => (await list()).json<PanelOrderView[]>().find((item) => item.id === order.id);
+    expect((await find())?.printedAt).toBeNull();
+
+    const mark = (as: PanelStore | null = store, id = order.id) =>
+      app.inject({
+        method: 'POST',
+        url: `/v1/panel/stores/${store.slug}/orders/${id}/printed`,
+        headers: as ? { cookie: as.cookie } : {},
+      });
+    expect((await mark()).statusCode).toBe(204);
+    const first = (await find())?.printedAt;
+    expect(Date.now() - Date.parse(first ?? '')).toBeLessThan(5_000);
+
+    // Reimprimir não muda o horário nem repete o evento.
+    expect((await mark()).statusCode).toBe(204);
+    expect((await find())?.printedAt).toBe(first);
+    const events = await dbRows("SELECT 1 FROM order_events WHERE order_id = $1 AND type = 'order.printed'", [
+      order.id,
+    ]);
+    expect(events).toHaveLength(1);
+
+    expect((await mark(null)).statusCode).toBe(401);
+    expect((await mark(other)).statusCode).toBe(404);
+    expect((await mark(store, newId())).statusCode).toBe(404);
+    expect((await mark(store, 'nao-e-id')).statusCode).toBe(404);
+  });
+
   it('entrega ao painel um token de tempo real válido só para o próprio restaurante', async () => {
     const res = await app.inject({
       method: 'POST',

@@ -144,3 +144,11 @@ export const IconAlert = (props: IconProps) => (
     <circle cx="12" cy="16.4" r="0.6" fill="currentColor" stroke="none" />
   </Icon>
 );
+
+/** Impressora de cupom: o corpo, a bandeja e o papel saindo por cima. */
+export const IconPrinter = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M7.5 9V4.5h9V9M6 16.5H4.5v-6A1.5 1.5 0 016 9h12a1.5 1.5 0 011.5 1.500v6H18" />
+    <path d="M7.500 14h9v5.500h-9zM10 16.800h4" />
+  </Icon>
+);

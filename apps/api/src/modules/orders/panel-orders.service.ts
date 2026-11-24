@@ -37,13 +37,14 @@ interface OrderRow {
   notes: string | null;
   coupon_code: string | null;
   courier_id: string | null;
+  printed_at: Date | null;
   delivery_address: DeliveryAddress | null;
   customer_name: string;
   customer_phone: string;
 }
 
 const ORDER_COLUMNS = `o.id, o.created_at, o.number, o.status, o.channel, o.fulfillment, o.payment_method,
-  o.subtotal_cents, o.delivery_fee_cents, o.discount_cents, o.total_cents, o.notes, o.coupon_code, o.courier_id,
+  o.subtotal_cents, o.delivery_fee_cents, o.discount_cents, o.total_cents, o.notes, o.coupon_code, o.courier_id, o.printed_at,
   o.delivery_address,
   c.name AS customer_name, c.phone AS customer_phone`;
 const ORDER_FROM = 'orders o JOIN customers c ON c.tenant_id = o.tenant_id AND c.id = o.customer_id';
@@ -205,6 +206,36 @@ export class PanelOrdersService {
     });
   }
 
+  /**
+   * Registra que o pedido saiu na impressora. Só a primeira impressão conta: reimprimir não
+   * muda o horário nem gera outro evento.
+   */
+  async markPrinted(tenantId: string, orderId: string, userId: string): Promise<void> {
+    if (!isUuidV7(orderId)) throw orderNotFound();
+    const createdAt = timeOfId(orderId);
+    await this.db.withTenant(tenantId, async (tx) => {
+      const marked = await tx.query(
+        `UPDATE orders SET printed_at = now(), updated_at = now()
+          WHERE tenant_id = $1 AND id = $2 AND created_at = $3 AND printed_at IS NULL`,
+        [tenantId, orderId, createdAt],
+      );
+      if (marked.rowCount) {
+        await tx.query(
+          `INSERT INTO order_events (tenant_id, id, order_id, order_created_at, type, payload)
+           VALUES ($1, $2, $3, $4, 'order.printed', $5)`,
+          [tenantId, newId(), orderId, createdAt, JSON.stringify({ userId })],
+        );
+        return;
+      }
+      const exists = await tx.query('SELECT 1 FROM orders WHERE tenant_id = $1 AND id = $2 AND created_at = $3', [
+        tenantId,
+        orderId,
+        createdAt,
+      ]);
+      if (exists.rowCount === 0) throw orderNotFound();
+    });
+  }
+
   /** Entregas em andamento de um entregador, da mais antiga para a mais nova. */
   async listForCourier(tenantId: string, courierId: string): Promise<CourierDeliveryView[]> {
     return this.db.withTenant(tenantId, async (tx) => {
@@ -295,6 +326,7 @@ export class PanelOrdersService {
       customer: { name: row.customer_name, phone: row.customer_phone },
       deliveryAddress: row.delivery_address,
       courier: row.courier_id ? { id: row.courier_id, name: courierNames.get(row.courier_id) ?? '' } : null,
+      printedAt: row.printed_at?.toISOString() ?? null,
     }));
   }
 }

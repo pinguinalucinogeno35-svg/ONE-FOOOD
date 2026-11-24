@@ -61,6 +61,13 @@ export class PanelOrdersController {
     return this.orders.assignCourier(store.tenantId, orderId, courierId, store.userId);
   }
 
+  /** O painel avisa que imprimiu o pedido. */
+  @Post('orders/:orderId/printed')
+  @HttpCode(204)
+  async markPrinted(@CurrentStore() store: StoreAuth, @Param('orderId') orderId: string): Promise<void> {
+    await this.orders.markPrinted(store.tenantId, orderId, store.userId);
+  }
+
   /**
    * Token curto para o painel abrir a conexão de tempo real. Vale 60 segundos e só para
    * este restaurante; o painel pede outro a cada reconexão.
