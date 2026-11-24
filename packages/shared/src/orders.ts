@@ -142,4 +142,6 @@ export interface PanelOrderView extends OrderView {
   customer: { name: string; phone: string };
   deliveryAddress: DeliveryAddress | null;
   courier: { id: string; name: string } | null;
+  /** Primeira vez em que o pedido foi impresso, ou null se ainda não foi. */
+  printedAt: string | null;
 }

@@ -141,6 +141,7 @@ Painel do restaurante, em `/v1/panel/stores/:slug` (exige sessão e vínculo com
 | `GET /couriers`, `POST /couriers`, `PATCH /couriers/:id` | Entregadores: listar, cadastrar, alterar e desligar | cadastrar e alterar: dono, gerente |
 | `POST /couriers/:id/access-token`                        | Troca o link pessoal do entregador                  | dono, gerente                      |
 | `POST /orders/:id/courier`                               | Define ou retira o entregador do pedido             | todos                              |
+| `POST /orders/:id/printed`                               | Registra que o pedido foi impresso                  | todos                              |
 
 Estados do pedido: `pending` → `confirmed` → `preparing` → `ready` → `completed`. Pedido de entrega passa por
 `out_for_delivery` antes de concluir. Qualquer estado em aberto pode ir para `cancelled`.
@@ -190,6 +191,21 @@ Entregador, em `/v1/courier` (exige o token do link pessoal em `Authorization: B
   demonstração. Em produção, contrate um provedor de mapas e aponte `NEXT_PUBLIC_MAP_TILES_URL` para ele.
 - **Fora desta entrega:** rotas, acerto de taxas e dinheiro com o entregador, e aviso ao entregador por WhatsApp
   quando um pedido é atribuído.
+
+## Impressão de pedidos
+
+- **Pelo navegador.** O quadro de pedidos imprime na impressora instalada no computador, térmica de 80 ou 58 mm
+  ou comum. Não há programa para instalar.
+- **Duas vias.** A da cozinha traz o que preparar, em letra grande, sem valores nem dados do cliente. A do
+  cliente traz valores, endereço e o que receber. Cada via sai em uma folha, para a impressora cortar entre elas.
+- **Ajustes por aparelho.** Quais vias, largura do papel e impressão automática ficam guardados no navegador:
+  o computador do balcão pode imprimir sozinho e o tablet da cozinha não.
+- **Impressão automática.** Com ela ligada, pedido novo sai sozinho. O servidor registra a primeira impressão
+  (`orders.printed_at`), então um pedido já impresso não se repete ao recarregar nem em outro aparelho.
+- **Janela de impressão.** O navegador mostra a janela a cada pedido. Para imprimir direto, abra o Chrome com
+  `--kiosk-printing` e deixe a impressora térmica como padrão.
+- **Fora desta entrega:** impressão direta em impressora térmica sem passar pelo navegador (comandos ESC/POS),
+  que exige um programa no computador do restaurante, e impressoras diferentes por setor (cozinha, bar).
 
 ## Cupons e avaliações
 

@@ -11,6 +11,7 @@ import {
 } from '@onefood/shared';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import {
   IconAlert,
   IconClock,
@@ -19,7 +20,9 @@ import {
   IconDelivery,
   IconLive,
   IconPickup,
+  IconPrinter,
 } from '../../../../components/icons';
+import { PrintTickets } from '../../../../components/print-tickets';
 import { ApiError, api, errorMessage } from '../../../../lib/api';
 import {
   ACTION_LABEL,
@@ -29,6 +32,12 @@ import {
   STATUS_LABEL,
   timeOf,
 } from '../../../../lib/labels';
+import {
+  DEFAULT_PRINT_SETTINGS,
+  loadPrintSettings,
+  type PrintSettings,
+  savePrintSettings,
+} from '../../../../lib/print-settings';
 import { usePanelStore } from '../store-context';
 
 const COLUMNS: Array<{ title: string; statuses: OrderStatus[] }> = [
@@ -53,19 +62,78 @@ export default function OrdersPage() {
   const [lowRatings, setLowRatings] = useState<Array<{ orderId: string; number: number; rating: number }>>([]);
   const showClosed = useRef(false);
   const [couriers, setCouriers] = useState<CourierView[]>([]);
+  // Impressão: o que está na bandeja, os ajustes deste aparelho e o que já foi mandado imprimir.
+  const [tickets, setTickets] = useState<PanelOrderView[]>([]);
+  const [printSettings, setPrintSettings] = useState<PrintSettings>(DEFAULT_PRINT_SETTINGS);
+  const settingsRef = useRef(printSettings);
+  settingsRef.current = printSettings;
+  const sentToPrinter = useRef(new Set<string>());
+  const printDialog = useRef<HTMLDialogElement>(null);
 
   const base = `/v1/panel/stores/${store.slug}`;
 
+  /**
+   * Manda os pedidos para a impressora, todos em um só trabalho de impressão, e avisa o
+   * servidor. As vias ficam montadas fora da tela até a próxima impressão.
+   */
+  const print = useCallback(
+    (toPrint: PanelOrderView[]) => {
+      if (toPrint.length === 0) return;
+      for (const order of toPrint) sentToPrinter.current.add(order.id);
+      // As vias precisam estar na página antes de abrir a impressão.
+      flushSync(() => setTickets(toPrint));
+      window.print();
+      for (const order of toPrint) {
+        api(`${base}/orders/${order.id}/printed`, { method: 'POST' }).catch(() => undefined);
+      }
+      setOrders((current) =>
+        current
+          ? current.map((order) =>
+              toPrint.some((printed) => printed.id === order.id) && !order.printedAt
+                ? { ...order, printedAt: new Date().toISOString() }
+                : order,
+            )
+          : current,
+      );
+    },
+    [base],
+  );
+
+  useEffect(() => {
+    setPrintSettings(loadPrintSettings());
+  }, []);
+
+  const changePrintSettings = (patch: Partial<PrintSettings>) => {
+    const next = { ...printSettings, ...patch };
+    setPrintSettings(next);
+    savePrintSettings(next);
+  };
+
   const refresh = useCallback(async () => {
     try {
-      setOrders(await api<PanelOrderView[]>(`${base}/orders?scope=open`));
+      const open = await api<PanelOrderView[]>(`${base}/orders?scope=open`);
+      setOrders(open);
+      // Impressão automática: pedido novo que ainda não saiu em nenhuma impressora.
+      const settings = settingsRef.current;
+      if (settings.auto && (settings.kitchen || settings.customer)) {
+        print(
+          open.filter(
+            (order) => order.status === 'pending' && !order.printedAt && !sentToPrinter.current.has(order.id),
+          ),
+        );
+      }
       if (showClosed.current) setClosed(await api<PanelOrderView[]>(`${base}/orders?scope=recent`));
       setError(null);
     } catch (failure) {
       setError(errorMessage(failure));
     }
     setNow(Date.now());
-  }, [base]);
+  }, [base, print]);
+
+  // Ligar a impressão automática já imprime o que estava esperando.
+  useEffect(() => {
+    if (printSettings.auto) void refresh();
+  }, [printSettings.auto, refresh]);
 
   useEffect(() => {
     void refresh();
@@ -178,9 +246,15 @@ export default function OrdersPage() {
     <main className="wide">
       <div className="row between" style={{ marginBottom: 16 }}>
         <h1>Pedidos</h1>
-        <span className={live ? 'tag tag-good' : 'tag tag-quiet'}>
-          <IconLive width={16} height={16} />
-          {live ? 'Ao vivo' : 'Reconectando'}
+        <span className="row">
+          <button type="button" className="btn btn-small" onClick={() => printDialog.current?.showModal()}>
+            <IconPrinter />
+            Impressão
+          </button>
+          <span className={live ? 'tag tag-good' : 'tag tag-quiet'}>
+            <IconLive width={16} height={16} />
+            {live ? 'Ao vivo' : 'Reconectando'}
+          </span>
         </span>
       </div>
       {error ? (
@@ -229,6 +303,7 @@ export default function OrdersPage() {
                       couriers={couriers}
                       onMove={move}
                       onAssign={assign}
+                      onPrint={(target) => print([target])}
                     />
                   ))}
                 </div>
@@ -262,6 +337,68 @@ export default function OrdersPage() {
           )
         ) : null}
       </div>
+
+      <dialog ref={printDialog} aria-labelledby="print-title">
+        <div className="dialog-body">
+          <div className="row between">
+            <h3 id="print-title">Impressão neste aparelho</h3>
+            <button
+              type="button"
+              className="btn btn-quiet btn-icon"
+              aria-label="Fechar"
+              onClick={() => printDialog.current?.close()}
+            >
+              <IconClose />
+            </button>
+          </div>
+          <p className="muted">
+            Vale para a impressora instalada neste computador. Cada aparelho guarda os próprios ajustes.
+          </p>
+          <fieldset>
+            <legend>O que imprimir</legend>
+            <label className="choice">
+              <input
+                type="checkbox"
+                checked={printSettings.kitchen}
+                onChange={(event) => changePrintSettings({ kitchen: event.target.checked })}
+              />
+              <span>Via da cozinha</span>
+            </label>
+            <label className="choice">
+              <input
+                type="checkbox"
+                checked={printSettings.customer}
+                onChange={(event) => changePrintSettings({ customer: event.target.checked })}
+              />
+              <span>Via do cliente</span>
+            </label>
+          </fieldset>
+          <label className="field">
+            <span>Largura do papel</span>
+            <select
+              value={printSettings.paper}
+              onChange={(event) => changePrintSettings({ paper: event.target.value === '58' ? '58' : '80' })}
+            >
+              <option value="80">80 mm</option>
+              <option value="58">58 mm</option>
+            </select>
+          </label>
+          <label className="choice">
+            <input
+              type="checkbox"
+              checked={printSettings.auto}
+              onChange={(event) => changePrintSettings({ auto: event.target.checked })}
+            />
+            <span>Imprimir sozinho quando chega um pedido novo</span>
+          </label>
+          <p className="muted">
+            O navegador mostra a janela de impressão a cada pedido. Para imprimir direto, sem a janela, abra o Chrome
+            com a opção de impressão silenciosa (--kiosk-printing) e deixe a impressora térmica como padrão.
+          </p>
+        </div>
+      </dialog>
+
+      <PrintTickets orders={tickets} storeName={store.name} settings={printSettings} />
     </main>
   );
 }
@@ -273,6 +410,7 @@ function OrderCard({
   couriers,
   onMove,
   onAssign,
+  onPrint,
 }: {
   order: PanelOrderView;
   now: number;
@@ -280,6 +418,7 @@ function OrderCard({
   couriers: CourierView[];
   onMove: (order: PanelOrderView, status: OrderStatus) => void;
   onAssign: (order: PanelOrderView, courierId: string | null) => void;
+  onPrint: (order: PanelOrderView) => void;
 }) {
   const minutes = minutesSince(order.createdAt, now);
   const next = allowedTransitions(order.status, order.fulfillment).filter((status) => status !== 'cancelled')[0];
@@ -379,6 +518,15 @@ function OrderCard({
         ) : null}
         <button type="button" className="btn btn-danger" disabled={busy} onClick={() => onMove(order, 'cancelled')}>
           Cancelar
+        </button>
+      </div>
+      <div className="row between">
+        <span className="muted">
+          {order.printedAt ? `Impresso às ${timeOf(order.printedAt)}` : 'Ainda não impresso'}
+        </span>
+        <button type="button" className="btn btn-small" onClick={() => onPrint(order)}>
+          <IconPrinter width={16} height={16} />
+          {order.printedAt ? 'Reimprimir' : 'Imprimir'}
         </button>
       </div>
     </article>
