@@ -622,3 +622,32 @@ legend {
   grid-template-columns: 1fr auto;
   gap: 8px;
 }
+
+/* Mapa do entregador */
+.map-frame {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.map {
+  height: 260px;
+  background: var(--line);
+  /* O mapa fica abaixo de janelas e da barra do carrinho. */
+  z-index: 0;
+}
+
+.map-zoom {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  display: grid;
+  gap: 4px;
+}
+
+.courier-pin {
+  background: none;
+  border: 0;
+}

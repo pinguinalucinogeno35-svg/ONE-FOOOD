@@ -10,6 +10,7 @@ export const RESERVED_SLUGS = [
   'admin',
   'painel',
   'entrar',
+  'entregador',
   'sair',
   'cadastro',
   'conta',

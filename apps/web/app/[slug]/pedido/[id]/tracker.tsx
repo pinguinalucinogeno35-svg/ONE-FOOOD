@@ -3,7 +3,8 @@
 import { formatBRL, isOpenStatus, type OrderStatus, type TrackedOrderView } from '@onefood/shared';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { IconBack, IconDone } from '../../../../components/icons';
+import { CourierMap } from '../../../../components/courier-map';
+import { IconBack, IconDelivery, IconDone } from '../../../../components/icons';
 import { ApiError, api, errorMessage } from '../../../../lib/api';
 import { PAYMENT_LABEL, STATUS_LABEL, timeOf } from '../../../../lib/labels';
 import { ReviewForm } from './review-form';
@@ -83,6 +84,25 @@ export function OrderTracker({ slug, orderId }: { slug: string; orderId: string 
           </ol>
         )}
       </section>
+
+      {order.courier ? (
+        <section className="card stack" style={{ marginTop: 16 }} aria-label="Entregador">
+          <p className="row" style={{ gap: 8 }}>
+            <IconDelivery />
+            <strong>
+              {order.status === 'out_for_delivery'
+                ? `${order.courier.name} está a caminho`
+                : `${order.courier.name} vai levar o seu pedido`}
+            </strong>
+          </p>
+          {order.courier.position ? (
+            <>
+              <CourierMap position={order.courier.position} label={`Mapa com a posição de ${order.courier.name}`} />
+              <p className="muted">Posição atualizada às {timeOf(order.courier.position.recordedAt)}.</p>
+            </>
+          ) : null}
+        </section>
+      ) : null}
 
       {order.status === 'completed' ? (
         <ReviewForm slug={slug} order={order} onReviewed={(review) => setOrder({ ...order, review })} />

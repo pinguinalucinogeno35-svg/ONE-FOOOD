@@ -22,9 +22,17 @@ export interface ReviewCreatedEvent {
   low: boolean;
 }
 
+export interface OrderCourierAssignedEvent {
+  orderId: string;
+  number: number;
+  /** null quando o entregador foi retirado do pedido. */
+  courierId: string | null;
+}
+
 export interface DomainEvents {
   'order.created': OrderCreatedEvent;
   'order.status_changed': OrderStatusChangedEvent;
+  'order.courier_assigned': OrderCourierAssignedEvent;
   'review.created': ReviewCreatedEvent;
 }
 export type DomainTopic = keyof DomainEvents;

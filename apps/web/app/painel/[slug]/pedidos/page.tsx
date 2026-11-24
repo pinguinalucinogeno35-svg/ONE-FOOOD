@@ -2,6 +2,7 @@
 
 import {
   allowedTransitions,
+  type CourierView,
   formatBRL,
   formatPhoneBR,
   type OrderStatus,
@@ -51,6 +52,7 @@ export default function OrdersPage() {
   // Notas baixas que chegaram enquanto o painel estava aberto.
   const [lowRatings, setLowRatings] = useState<Array<{ orderId: string; number: number; rating: number }>>([]);
   const showClosed = useRef(false);
+  const [couriers, setCouriers] = useState<CourierView[]>([]);
 
   const base = `/v1/panel/stores/${store.slug}`;
 
@@ -70,6 +72,26 @@ export default function OrdersPage() {
     const timer = setInterval(refresh, REFRESH_MS);
     return () => clearInterval(timer);
   }, [refresh]);
+
+  useEffect(() => {
+    api<CourierView[]>(`${base}/couriers`).then(
+      (list) => setCouriers(list.filter((courier) => courier.active)),
+      () => undefined,
+    );
+  }, [base]);
+
+  const assign = async (order: PanelOrderView, courierId: string | null) => {
+    setBusy(order.id);
+    try {
+      await api(`${base}/orders/${order.id}/courier`, { method: 'POST', body: { courierId } });
+      setError(null);
+    } catch (failure) {
+      setError(errorMessage(failure));
+    } finally {
+      setBusy(null);
+    }
+    await refresh();
+  };
 
   // Conexão ao vivo: a cada aviso do servidor, relê a lista. Se cair, tenta de novo com espera crescente.
   useEffect(() => {
@@ -199,7 +221,15 @@ export default function OrdersPage() {
                 <div className="stack">
                   {inColumn.length === 0 ? <p className="empty">Nenhum pedido.</p> : null}
                   {inColumn.map((order) => (
-                    <OrderCard key={order.id} order={order} now={now} busy={busy === order.id} onMove={move} />
+                    <OrderCard
+                      key={order.id}
+                      order={order}
+                      now={now}
+                      busy={busy === order.id}
+                      couriers={couriers}
+                      onMove={move}
+                      onAssign={assign}
+                    />
                   ))}
                 </div>
               </section>
@@ -240,12 +270,16 @@ function OrderCard({
   order,
   now,
   busy,
+  couriers,
   onMove,
+  onAssign,
 }: {
   order: PanelOrderView;
   now: number;
   busy: boolean;
+  couriers: CourierView[];
   onMove: (order: PanelOrderView, status: OrderStatus) => void;
+  onAssign: (order: PanelOrderView, courierId: string | null) => void;
 }) {
   const minutes = minutesSince(order.createdAt, now);
   const next = allowedTransitions(order.status, order.fulfillment).filter((status) => status !== 'cancelled')[0];
@@ -297,6 +331,28 @@ function OrderCard({
           {address.street}, {address.number}
           {address.complement ? `, ${address.complement}` : ''} · {address.district}, {address.city}
         </p>
+      ) : null}
+      {order.fulfillment === 'delivery' ? (
+        <label className="field">
+          <span>Entregador</span>
+          <select
+            aria-label={`Entregador do pedido ${order.number}`}
+            value={order.courier?.id ?? ''}
+            disabled={busy}
+            onChange={(event) => onAssign(order, event.target.value || null)}
+          >
+            <option value="">Sem entregador</option>
+            {/* Entregador desligado depois de atribuído continua aparecendo neste pedido. */}
+            {order.courier && !couriers.some((courier) => courier.id === order.courier?.id) ? (
+              <option value={order.courier.id}>{order.courier.name}</option>
+            ) : null}
+            {couriers.map((courier) => (
+              <option key={courier.id} value={courier.id}>
+                {courier.name}
+              </option>
+            ))}
+          </select>
+        </label>
       ) : null}
       {order.couponCode ? (
         <p className="row muted" style={{ gap: 6 }}>

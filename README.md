@@ -126,34 +126,39 @@ Conta:
 
 Painel do restaurante, em `/v1/panel/stores/:slug` (exige sessão e vínculo com a loja):
 
-| Rota                                                  | O que faz                                           | Quem                            |
-| ----------------------------------------------------- | --------------------------------------------------- | ------------------------------- |
-| `GET /menu`                                           | Cardápio completo, com itens desativados            | todos                           |
-| `PATCH /`                                             | Nome da loja e taxa de entrega                      | dono, gerente                   |
-| `POST /categories`, `PATCH /categories/:id`           | Categorias                                          | dono, gerente                   |
-| `POST /products`, `PATCH /products/:id`               | Produtos                                            | dono, gerente                   |
-| `PUT /products/:id/option-groups`                     | Substitui os grupos de opções do produto            | dono, gerente                   |
-| `GET /orders?scope=open\|recent`                      | Pedidos em andamento ou encerrados nas últimas 24 h | todos                           |
-| `POST /orders/:id/status`                             | Avança ou cancela o pedido                          | todos                           |
-| `POST /realtime-token`                                | Token de 60 s para a conexão de tempo real          | todos                           |
-| `GET /coupons`, `POST /coupons`, `PATCH /coupons/:id` | Cupons: listar, criar, ligar e desligar             | criar e desligar: dono, gerente |
-| `GET /reviews`                                        | Média geral, média por prato e avaliações recentes  | todos                           |
+| Rota                                                     | O que faz                                           | Quem                               |
+| -------------------------------------------------------- | --------------------------------------------------- | ---------------------------------- |
+| `GET /menu`                                              | Cardápio completo, com itens desativados            | todos                              |
+| `PATCH /`                                                | Nome da loja e taxa de entrega                      | dono, gerente                      |
+| `POST /categories`, `PATCH /categories/:id`              | Categorias                                          | dono, gerente                      |
+| `POST /products`, `PATCH /products/:id`                  | Produtos                                            | dono, gerente                      |
+| `PUT /products/:id/option-groups`                        | Substitui os grupos de opções do produto            | dono, gerente                      |
+| `GET /orders?scope=open\|recent`                         | Pedidos em andamento ou encerrados nas últimas 24 h | todos                              |
+| `POST /orders/:id/status`                                | Avança ou cancela o pedido                          | todos                              |
+| `POST /realtime-token`                                   | Token de 60 s para a conexão de tempo real          | todos                              |
+| `GET /coupons`, `POST /coupons`, `PATCH /coupons/:id`    | Cupons: listar, criar, ligar e desligar             | criar e desligar: dono, gerente    |
+| `GET /reviews`                                           | Média geral, média por prato e avaliações recentes  | todos                              |
+| `GET /couriers`, `POST /couriers`, `PATCH /couriers/:id` | Entregadores: listar, cadastrar, alterar e desligar | cadastrar e alterar: dono, gerente |
+| `POST /couriers/:id/access-token`                        | Troca o link pessoal do entregador                  | dono, gerente                      |
+| `POST /orders/:id/courier`                               | Define ou retira o entregador do pedido             | todos                              |
 
 Estados do pedido: `pending` → `confirmed` → `preparing` → `ready` → `completed`. Pedido de entrega passa por
 `out_for_delivery` antes de concluir. Qualquer estado em aberto pode ir para `cancelled`.
 
 ## Telas
 
-| Endereço                   | O que é                                               |
-| -------------------------- | ----------------------------------------------------- |
-| `/cadastro`, `/entrar`     | Criar a loja e entrar no painel                       |
-| `/:slug`                   | Cardápio público com carrinho e finalização do pedido |
-| `/:slug/pedido/:id`        | Acompanhamento do pedido pelo cliente                 |
-| `/painel/:slug/pedidos`    | Quadro de pedidos ao vivo                             |
-| `/painel/:slug/cardapio`   | Categorias, produtos e opções                         |
-| `/painel/:slug/cupons`     | Cupons de desconto                                    |
-| `/painel/:slug/avaliacoes` | Notas dos clientes, geral e por prato                 |
-| `/painel/:slug/loja`       | Nome da loja e taxa de entrega                        |
+| Endereço                     | O que é                                                      |
+| ---------------------------- | ------------------------------------------------------------ |
+| `/cadastro`, `/entrar`       | Criar a loja e entrar no painel                              |
+| `/:slug`                     | Cardápio público com carrinho e finalização do pedido        |
+| `/:slug/pedido/:id`          | Acompanhamento do pedido pelo cliente                        |
+| `/painel/:slug/pedidos`      | Quadro de pedidos ao vivo                                    |
+| `/painel/:slug/cardapio`     | Categorias, produtos e opções                                |
+| `/painel/:slug/cupons`       | Cupons de desconto                                           |
+| `/painel/:slug/entregadores` | Entregadores e o link pessoal de cada um                     |
+| `/entregador/:token`         | Página do entregador: entregas, saída, entrega e localização |
+| `/painel/:slug/avaliacoes`   | Notas dos clientes, geral e por prato                        |
+| `/painel/:slug/loja`         | Nome da loja e taxa de entrega                               |
 
 - **O navegador fala só com o site.** `app/api/[...path]/route.ts` repassa as chamadas para a API, então o
   cookie de sessão é do próprio site e não há requisição entre origens.
@@ -162,6 +167,29 @@ Estados do pedido: `pending` → `confirmed` → `preparing` → `ready` → `co
 - **Ícones próprios.** `components/icons.tsx` é o único conjunto de ícones; nenhum emoji ou caractere faz
   papel de ícone.
 - **Pix fora da finalização.** O cliente escolhe dinheiro ou cartão na entrega até a integração de Pix existir.
+
+## Entrega com motoboy próprio
+
+Entregador, em `/v1/courier` (exige o token do link pessoal em `Authorization: Bearer`):
+
+| Rota                          | O que faz                                   |
+| ----------------------------- | ------------------------------------------- |
+| `GET /deliveries`             | Entregas em andamento do próprio entregador |
+| `POST /deliveries/:id/status` | Avisa que saiu para entrega ou que entregou |
+| `POST /position`              | Envia a posição do aparelho                 |
+
+- **Sem app e sem senha.** O entregador entra por um link pessoal. O banco guarda só o hash do token, e o
+  restaurante troca o link quando quiser; o antigo para de funcionar na hora.
+- **O entregador só mexe no que é dele.** Pedido de outro entregador, ou sem entregador, responde como
+  inexistente. As únicas mudanças que ele faz são "saiu para entrega" e "entregou".
+- **Localização é dado pessoal.** Fica guardada só a última posição, no Redis de cache, por 5 minutos. Não há
+  histórico de trajeto. O cliente vê a posição só enquanto o pedido está a caminho, e do entregador vê apenas o
+  primeiro nome.
+- **O entregador decide compartilhar.** A localização só é enviada depois que ele liga, na página dele.
+- **Mapa.** O site usa Leaflet com o servidor público do OpenStreetMap, que serve para desenvolvimento e
+  demonstração. Em produção, contrate um provedor de mapas e aponte `NEXT_PUBLIC_MAP_TILES_URL` para ele.
+- **Fora desta entrega:** rotas, acerto de taxas e dinheiro com o entregador, e aviso ao entregador por WhatsApp
+  quando um pedido é atribuído.
 
 ## Cupons e avaliações
 

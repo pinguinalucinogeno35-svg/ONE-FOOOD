@@ -7,7 +7,15 @@ import { menuTag } from '../../../lib/menu-cache';
  */
 const API_URL = process.env.API_URL ?? 'http://localhost:3000';
 const MAX_BODY_BYTES = 256 * 1024;
-const REQUEST_HEADERS = ['content-type', 'cookie', 'idempotency-key', 'origin', 'user-agent', 'x-forwarded-for'];
+const REQUEST_HEADERS = [
+  'authorization',
+  'content-type',
+  'cookie',
+  'idempotency-key',
+  'origin',
+  'user-agent',
+  'x-forwarded-for',
+];
 const RESPONSE_HEADERS = ['content-type', 'cache-control'];
 
 export const dynamic = 'force-dynamic';

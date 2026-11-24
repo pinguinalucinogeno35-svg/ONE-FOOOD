@@ -10,7 +10,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { type PanelOrderView, updateOrderStatusSchema } from '@onefood/shared';
+import { assignCourierSchema, type PanelOrderView, updateOrderStatusSchema } from '@onefood/shared';
 import type { Config } from '../../config.js';
 import { parseBody } from '../../platform/http/validation.js';
 import { CONFIG } from '../../platform/tokens.js';
@@ -46,7 +46,19 @@ export class PanelOrdersController {
     @Body() body: unknown,
   ): Promise<PanelOrderView> {
     const { status } = parseBody(updateOrderStatusSchema, body);
-    return this.orders.changeStatus(store.tenantId, orderId, status, store.userId);
+    return this.orders.changeStatus(store.tenantId, orderId, status, { userId: store.userId });
+  }
+
+  /** Escolhe quem leva o pedido. Qualquer membro do restaurante pode atribuir. */
+  @Post('orders/:orderId/courier')
+  @HttpCode(200)
+  assignCourier(
+    @CurrentStore() store: StoreAuth,
+    @Param('orderId') orderId: string,
+    @Body() body: unknown,
+  ): Promise<PanelOrderView> {
+    const { courierId } = parseBody(assignCourierSchema, body);
+    return this.orders.assignCourier(store.tenantId, orderId, courierId, store.userId);
   }
 
   /**

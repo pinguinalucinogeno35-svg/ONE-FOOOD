@@ -10,6 +10,7 @@ import { type PanelStore, StoreContext } from './store-context';
 const TABS = [
   { path: 'pedidos', label: 'Pedidos' },
   { path: 'cardapio', label: 'Cardápio' },
+  { path: 'entregadores', label: 'Entregadores' },
   { path: 'cupons', label: 'Cupons' },
   { path: 'avaliacoes', label: 'Avaliações' },
   { path: 'loja', label: 'Loja' },

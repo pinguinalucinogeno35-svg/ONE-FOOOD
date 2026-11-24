@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { couponCodeSchema } from './coupons.js';
+import type { TrackedCourierView } from './delivery.js';
 import type { OrderReviewView } from './reviews.js';
 
 export const ORDER_STATUSES = [
@@ -105,6 +106,8 @@ export interface OrderView {
 /** Pedido como o cliente acompanha: inclui a avaliação que ele deixou, se já avaliou. */
 export interface TrackedOrderView extends OrderView {
   review: OrderReviewView | null;
+  /** Entregador do pedido, quando há um atribuído. */
+  courier: TrackedCourierView | null;
 }
 
 /**
@@ -138,4 +141,5 @@ export const updateOrderStatusSchema = z.object({ status: z.enum(ORDER_STATUSES)
 export interface PanelOrderView extends OrderView {
   customer: { name: string; phone: string };
   deliveryAddress: DeliveryAddress | null;
+  courier: { id: string; name: string } | null;
 }

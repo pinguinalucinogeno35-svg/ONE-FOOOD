@@ -9,12 +9,15 @@ import type {
   OrderStatus,
   OrderView,
   PaymentMethod,
+  TrackedCourierView,
   TrackedOrderView,
 } from '@onefood/shared';
+import { isOpenStatus } from '@onefood/shared';
 import { TenantDb, type TenantTx } from '../../platform/db/tenant-db.js';
 import { isUuidV7, newId, timeOfId } from '../../platform/ids.js';
 import { CatalogService } from '../catalog/index.js';
 import { CouponError, CouponsService } from '../coupons/index.js';
+import { CouriersService } from '../delivery/index.js';
 import { Outbox } from '../outbox/index.js';
 import { PricingError, priceOrder } from './pricing.js';
 import { ReviewsService } from './reviews.service.js';
@@ -35,6 +38,7 @@ export class OrdersService {
     @Inject(Outbox) private readonly outbox: Outbox,
     @Inject(CouponsService) private readonly coupons: CouponsService,
     @Inject(ReviewsService) private readonly reviews: ReviewsService,
+    @Inject(CouriersService) private readonly couriers: CouriersService,
   ) {}
 
   /**
@@ -219,10 +223,29 @@ export class OrdersService {
     if (!isUuidV7(orderId)) throw orderNotFound();
     const tracked = await this.db.withTenant(tenantId, async (tx) => {
       const order = await this.load(tx, orderId);
-      return order ? { ...order, review: await this.reviews.find(tx, orderId) } : null;
+      if (!order) return null;
+      const assigned = await tx.query<{ courier_id: string | null }>(
+        'SELECT courier_id FROM orders WHERE tenant_id = $1 AND id = $2 AND created_at = $3',
+        [tenantId, orderId, timeOfId(orderId)],
+      );
+      const courierId = assigned.rows[0]?.courier_id ?? null;
+      const courierName = courierId ? (await this.couriers.namesOf(tx, [courierId])).get(courierId) : undefined;
+      return { order, review: await this.reviews.find(tx, orderId), courierId, courierName };
     });
     if (!tracked) throw orderNotFound();
-    return tracked;
+
+    // O cliente vê só o primeiro nome do entregador, e a posição só enquanto o pedido está a caminho.
+    let courier: TrackedCourierView | null = null;
+    if (tracked.courierId && tracked.courierName && isOpenStatus(tracked.order.status)) {
+      courier = {
+        name: tracked.courierName.split(' ')[0] ?? tracked.courierName,
+        position:
+          tracked.order.status === 'out_for_delivery'
+            ? await this.couriers.lastPosition(tenantId, tracked.courierId)
+            : null,
+      };
+    }
+    return { ...tracked.order, review: tracked.review, courier };
   }
 
   private async replay(tx: TenantTx, idempotencyKey: string, requestHash: string): Promise<OrderView> {

@@ -65,6 +65,7 @@ describe('fronteiras do monólito modular', () => {
       idempotency_keys: 'orders',
       customers: 'orders',
       outbox: 'outbox',
+      couriers: 'delivery',
       coupons: 'coupons',
       coupon_redemptions: 'coupons',
       order_reviews: 'orders',
