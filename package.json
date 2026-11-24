@@ -1,0 +1,26 @@
+{
+  "name": "onefood",
+  "private": true,
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "test": "pnpm -r test",
+    "services:up": "docker compose up -d --wait",
+    "services:down": "docker compose down",
+    "db:migrate": "pnpm --filter @onefood/api db:migrate",
+    "db:seed": "pnpm --filter @onefood/api db:seed",
+    "dev:api": "pnpm --filter @onefood/api dev:api",
+    "dev:worker": "pnpm --filter @onefood/api dev:worker",
+    "dev:realtime": "pnpm --filter @onefood/api dev:realtime",
+    "dev:web": "pnpm --filter @onefood/web dev"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.6.9"
+  }
+}

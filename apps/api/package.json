@@ -1,0 +1,44 @@
+{
+  "name": "@onefood/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "dev:api": "tsx watch --env-file-if-exists=../../.env src/main.api.ts",
+    "dev:worker": "tsx watch --env-file-if-exists=../../.env src/main.worker.ts",
+    "dev:realtime": "tsx watch --env-file-if-exists=../../.env src/main.realtime.ts",
+    "db:migrate": "tsx --env-file-if-exists=../../.env src/migrate.ts",
+    "db:seed": "tsx --env-file-if-exists=../../.env src/seed.ts"
+  },
+  "dependencies": {
+    "@nestjs/common": "^12.6.0",
+    "@nestjs/core": "^12.6.0",
+    "@nestjs/platform-fastify": "^12.6.0",
+    "@onefood/shared": "workspace:*",
+    "@opentelemetry/auto-instrumentations-node": "^0.83.1",
+    "@opentelemetry/sdk-node": "^0.301.2",
+    "bullmq": "^6.7.10",
+    "fastify": "^5.12.8",
+    "ioredis": "^6.1.0",
+    "nestjs-pino": "^5.3.2",
+    "pg": "^8.23.1",
+    "pino": "^10.4.0",
+    "pino-http": "^11.0.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "uuid": "^11.1.1",
+    "ws": "^8.23.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "@types/pg": "^8.23.1",
+    "@types/ws": "^8.18.2",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.1"
+  }
+}

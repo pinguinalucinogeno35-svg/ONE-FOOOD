@@ -1,0 +1,10 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Scripts de instalação de dependências ficam desligados por padrão (pnpm 10).
+# Nenhum destes é necessário: os binários já vêm prontos nos pacotes opcionais.
+ignoredBuiltDependencies:
+  - esbuild
+  - msgpackr-extract
+  - protobufjs
