@@ -65,6 +65,9 @@ describe('fronteiras do monólito modular', () => {
       idempotency_keys: 'orders',
       customers: 'orders',
       outbox: 'outbox',
+      users: 'identity',
+      sessions: 'identity',
+      memberships: 'identity',
     };
     const violations: string[] = [];
     for (const file of filesUnder(MODULES)) {

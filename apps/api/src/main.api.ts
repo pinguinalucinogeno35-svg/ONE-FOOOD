@@ -3,20 +3,23 @@ import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { Logger } from 'nestjs-pino';
 import { ApiModule } from './app.modules.js';
-import type { Config } from './config.js';
-import { CONFIG } from './platform/tokens.js';
+import { loadConfig } from './config.js';
+import { trustProxyHops } from './platform/http/trust-proxy.js';
 
 async function main(): Promise<void> {
+  const config = loadConfig();
   const app = await NestFactory.create<NestFastifyApplication>(
     ApiModule,
-    // Atrás de balanceador: o IP do cliente vem do cabeçalho encaminhado.
-    new FastifyAdapter({ trustProxy: true, bodyLimit: 256 * 1024 }),
+    // O IP do cliente só vem do cabeçalho encaminhado quando há proxies confiáveis declarados.
+    new FastifyAdapter({
+      trustProxy: trustProxyHops(config.TRUST_PROXY_HOPS),
+      bodyLimit: 256 * 1024,
+    }),
     { bufferLogs: true },
   );
   app.useLogger(app.get(Logger));
   app.enableShutdownHooks();
 
-  const config = app.get<Config>(CONFIG);
   await app.listen(config.PORT, '0.0.0.0');
 }
 

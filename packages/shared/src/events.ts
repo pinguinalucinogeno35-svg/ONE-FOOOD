@@ -7,8 +7,16 @@ export interface OrderCreatedEvent {
   paymentMethod: string;
 }
 
+export interface OrderStatusChangedEvent {
+  orderId: string;
+  number: number;
+  from: string;
+  to: string;
+}
+
 export interface DomainEvents {
   'order.created': OrderCreatedEvent;
+  'order.status_changed': OrderStatusChangedEvent;
 }
 export type DomainTopic = keyof DomainEvents;
 

@@ -12,6 +12,9 @@ const env = {
   REDIS_QUEUE_URL: 'redis://127.0.0.1:6379/2',
   REDIS_CACHE_URL: 'redis://127.0.0.1:6379/3',
   REALTIME_TOKEN_SECRET: 'segredo-somente-para-os-testes-automatizados',
+  // Todos os testes saem do mesmo IP; os limites por IP são testados à parte.
+  SIGNUP_LIMIT_PER_IP_HOUR: '0',
+  ORDER_LIMIT_PER_IP_10MIN: '0',
 };
 for (const [key, value] of Object.entries(env)) {
   if (key.startsWith('DATABASE_') || key.startsWith('REDIS_')) process.env[key] ??= value;
