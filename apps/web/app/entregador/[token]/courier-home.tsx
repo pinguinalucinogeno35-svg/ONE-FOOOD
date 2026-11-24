@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { IconLive } from '../../../components/icons';
 import { ApiError, api, errorMessage } from '../../../lib/api';
 import { STATUS_LABEL } from '../../../lib/labels';
+import { deliveriesLabel, settlementLine } from '../../../lib/settlement';
 
 const REFRESH_MS = 15_000;
 /** Intervalo mínimo entre dois envios de posição. */
@@ -180,6 +181,32 @@ export function CourierHome({ token }: { token: string }) {
           {error}
         </p>
       ) : null}
+
+      <section className="card stack" style={{ marginTop: 16, gap: 8 }} aria-label="Meu acerto">
+        <div className="row between">
+          <strong>Meu acerto</strong>
+          <span className="muted">
+            {home.settlement.deliveries === 0 ? 'Nada a acertar' : deliveriesLabel(home.settlement.deliveries)}
+          </span>
+        </div>
+        {home.settlement.deliveries > 0 ? (
+          <>
+            <div className="totals">
+              <div>
+                <span>A receber pelas entregas</span>
+                <span className="tabular">{formatBRL(home.settlement.feesCents)}</span>
+              </div>
+              <div>
+                <span>Dinheiro que está com você</span>
+                <span className="tabular">{formatBRL(home.settlement.cashCents)}</span>
+              </div>
+            </div>
+            <p>
+              <strong>{settlementLine(home.settlement, null)}</strong>
+            </p>
+          </>
+        ) : null}
+      </section>
 
       <h2>Entregas</h2>
       {home.deliveries.length === 0 ? (

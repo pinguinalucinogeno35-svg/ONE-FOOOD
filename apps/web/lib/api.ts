@@ -60,6 +60,7 @@ const MESSAGES: Record<string, string> = {
   courier_link_invalid: 'Este link não vale mais. Peça um novo ao restaurante.',
   not_a_delivery: 'Só pedidos de entrega têm entregador.',
   order_closed: 'Este pedido já foi encerrado.',
+  nothing_to_settle: 'Não há entregas para acertar com este entregador.',
   coupon_not_found: 'Cupom não encontrado.',
   review_not_available: 'Este pedido ainda não pode ser avaliado.',
   already_reviewed: 'Este pedido já foi avaliado.',

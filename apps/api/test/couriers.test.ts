@@ -102,7 +102,11 @@ describe('entregadores', () => {
       expect(courier.accessToken).toMatch(/^[A-Za-z0-9_-]{43}$/);
 
       const listed = (await panel('GET', '/couriers')).json<CourierView[]>();
-      expect(listed.find((item) => item.id === courier.id)).toMatchObject({ name: 'João Batista', active: true });
+      expect(listed.find((item) => item.id === courier.id)).toMatchObject({
+        name: 'João Batista',
+        active: true,
+        feePerDeliveryCents: null,
+      });
 
       const home = await asCourier(courier.accessToken, 'GET', '/deliveries');
       expect(home.statusCode).toBe(200);
@@ -110,6 +114,7 @@ describe('entregadores', () => {
         courier: { name: 'João Batista' },
         store: { name: `Loja ${store.slug}` },
         deliveries: [],
+        settlement: { deliveries: 0, feesCents: 0, cashCents: 0 },
       });
     });
 
