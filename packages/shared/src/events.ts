@@ -14,9 +14,18 @@ export interface OrderStatusChangedEvent {
   to: string;
 }
 
+export interface ReviewCreatedEvent {
+  orderId: string;
+  number: number;
+  rating: number;
+  /** true para nota baixa: o painel destaca na hora. */
+  low: boolean;
+}
+
 export interface DomainEvents {
   'order.created': OrderCreatedEvent;
   'order.status_changed': OrderStatusChangedEvent;
+  'review.created': ReviewCreatedEvent;
 }
 export type DomainTopic = keyof DomainEvents;
 

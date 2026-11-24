@@ -108,11 +108,13 @@ na Fase 1 como novos consumidores do mesmo evento.
 
 Público, sem login:
 
-| Rota                              | O que faz                               |
-| --------------------------------- | --------------------------------------- |
-| `GET /v1/stores/:slug/menu`       | Cardápio da loja                        |
-| `POST /v1/stores/:slug/orders`    | Cria o pedido (exige `Idempotency-Key`) |
-| `GET /v1/stores/:slug/orders/:id` | Acompanhamento do pedido pelo cliente   |
+| Rota                                      | O que faz                               |
+| ----------------------------------------- | --------------------------------------- |
+| `GET /v1/stores/:slug/menu`               | Cardápio da loja                        |
+| `POST /v1/stores/:slug/orders`            | Cria o pedido (exige `Idempotency-Key`) |
+| `GET /v1/stores/:slug/orders/:id`         | Acompanhamento do pedido pelo cliente   |
+| `POST /v1/stores/:slug/coupons/preview`   | Confere um cupom e devolve o desconto   |
+| `POST /v1/stores/:slug/orders/:id/review` | Avaliação do pedido concluído           |
 
 Conta:
 
@@ -124,30 +126,34 @@ Conta:
 
 Painel do restaurante, em `/v1/panel/stores/:slug` (exige sessão e vínculo com a loja):
 
-| Rota                                        | O que faz                                           | Quem          |
-| ------------------------------------------- | --------------------------------------------------- | ------------- |
-| `GET /menu`                                 | Cardápio completo, com itens desativados            | todos         |
-| `PATCH /`                                   | Nome da loja e taxa de entrega                      | dono, gerente |
-| `POST /categories`, `PATCH /categories/:id` | Categorias                                          | dono, gerente |
-| `POST /products`, `PATCH /products/:id`     | Produtos                                            | dono, gerente |
-| `PUT /products/:id/option-groups`           | Substitui os grupos de opções do produto            | dono, gerente |
-| `GET /orders?scope=open\|recent`            | Pedidos em andamento ou encerrados nas últimas 24 h | todos         |
-| `POST /orders/:id/status`                   | Avança ou cancela o pedido                          | todos         |
-| `POST /realtime-token`                      | Token de 60 s para a conexão de tempo real          | todos         |
+| Rota                                                  | O que faz                                           | Quem                            |
+| ----------------------------------------------------- | --------------------------------------------------- | ------------------------------- |
+| `GET /menu`                                           | Cardápio completo, com itens desativados            | todos                           |
+| `PATCH /`                                             | Nome da loja e taxa de entrega                      | dono, gerente                   |
+| `POST /categories`, `PATCH /categories/:id`           | Categorias                                          | dono, gerente                   |
+| `POST /products`, `PATCH /products/:id`               | Produtos                                            | dono, gerente                   |
+| `PUT /products/:id/option-groups`                     | Substitui os grupos de opções do produto            | dono, gerente                   |
+| `GET /orders?scope=open\|recent`                      | Pedidos em andamento ou encerrados nas últimas 24 h | todos                           |
+| `POST /orders/:id/status`                             | Avança ou cancela o pedido                          | todos                           |
+| `POST /realtime-token`                                | Token de 60 s para a conexão de tempo real          | todos                           |
+| `GET /coupons`, `POST /coupons`, `PATCH /coupons/:id` | Cupons: listar, criar, ligar e desligar             | criar e desligar: dono, gerente |
+| `GET /reviews`                                        | Média geral, média por prato e avaliações recentes  | todos                           |
 
 Estados do pedido: `pending` → `confirmed` → `preparing` → `ready` → `completed`. Pedido de entrega passa por
 `out_for_delivery` antes de concluir. Qualquer estado em aberto pode ir para `cancelled`.
 
 ## Telas
 
-| Endereço                 | O que é                                               |
-| ------------------------ | ----------------------------------------------------- |
-| `/cadastro`, `/entrar`   | Criar a loja e entrar no painel                       |
-| `/:slug`                 | Cardápio público com carrinho e finalização do pedido |
-| `/:slug/pedido/:id`      | Acompanhamento do pedido pelo cliente                 |
-| `/painel/:slug/pedidos`  | Quadro de pedidos ao vivo                             |
-| `/painel/:slug/cardapio` | Categorias, produtos e opções                         |
-| `/painel/:slug/loja`     | Nome da loja e taxa de entrega                        |
+| Endereço                   | O que é                                               |
+| -------------------------- | ----------------------------------------------------- |
+| `/cadastro`, `/entrar`     | Criar a loja e entrar no painel                       |
+| `/:slug`                   | Cardápio público com carrinho e finalização do pedido |
+| `/:slug/pedido/:id`        | Acompanhamento do pedido pelo cliente                 |
+| `/painel/:slug/pedidos`    | Quadro de pedidos ao vivo                             |
+| `/painel/:slug/cardapio`   | Categorias, produtos e opções                         |
+| `/painel/:slug/cupons`     | Cupons de desconto                                    |
+| `/painel/:slug/avaliacoes` | Notas dos clientes, geral e por prato                 |
+| `/painel/:slug/loja`       | Nome da loja e taxa de entrega                        |
 
 - **O navegador fala só com o site.** `app/api/[...path]/route.ts` repassa as chamadas para a API, então o
   cookie de sessão é do próprio site e não há requisição entre origens.
@@ -156,6 +162,17 @@ Estados do pedido: `pending` → `confirmed` → `preparing` → `ready` → `co
 - **Ícones próprios.** `components/icons.tsx` é o único conjunto de ícones; nenhum emoji ou caractere faz
   papel de ícone.
 - **Pix fora da finalização.** O cliente escolhe dinheiro ou cartão na entrega até a integração de Pix existir.
+
+## Cupons e avaliações
+
+- **Cupom.** Percentual ou de valor fixo, com pedido mínimo, teto, validade, limite de usos e um uso por
+  cliente (pelo telefone). O desconto vale só sobre os itens, nunca sobre a entrega, e quem calcula é o servidor.
+- **Limite de usos sob concorrência.** O resgate trava a linha do cupom dentro da transação do pedido.
+- **Cancelamento devolve o cupom.** O uso volta para a contagem e o cliente pode usar de novo.
+- **Avaliação.** Uma por pedido, só depois de concluído, na própria página de acompanhamento: nota geral,
+  nota por prato e comentário. Nota 1 ou 2 avisa o painel na hora.
+- **Sem WhatsApp por enquanto.** O plano prevê pedir a avaliação por WhatsApp; hoje o cliente avalia na página
+  do pedido. Quando a integração existir, a mensagem só precisa levar o link.
 
 ## Segurança de acesso
 
@@ -166,8 +183,8 @@ Estados do pedido: `pending` → `confirmed` → `preparing` → `ready` → `co
   sessão for membro dele; quem não é recebe o mesmo 404 de loja inexistente.
 - **Usuários e sessões fechados no banco.** A aplicação não tem acesso direto a essas tabelas, só às funções
   `app.*` de identidade.
-- **Limites de uso** no Redis de cache: cadastro e pedidos por IP, tentativas de login por conta, pedidos por
-  loja. Se o Redis cair, o limite deixa passar em vez de parar os pedidos.
+- **Limites de uso** no Redis de cache: cadastro, pedidos, conferência de cupom e avaliações por IP, tentativas
+  de login por conta, pedidos por loja. Se o Redis cair, o limite deixa passar em vez de parar os pedidos.
 - **IP do cliente.** `TRUST_PROXY_HOPS` diz quantos proxies confiáveis há na frente da API. Com o valor errado,
   o limite por IP conta o IP do balanceador ou aceita IP forjado. O site também é um salto: em produção, os
   pedidos chegam à API pelo servidor do site, que precisa entrar nessa conta junto com o balanceador.

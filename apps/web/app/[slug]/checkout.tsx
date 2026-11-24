@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  type CouponPreview,
   type CreateOrderInput,
   type Fulfillment,
   formatBRL,
@@ -10,8 +11,8 @@ import {
   toE164BR,
 } from '@onefood/shared';
 import { useRouter } from 'next/navigation';
-import { type FormEvent, useRef, useState } from 'react';
-import { IconBack, IconDelivery, IconMinus, IconPickup, IconPlus } from '../../components/icons';
+import { type FormEvent, useEffect, useRef, useState } from 'react';
+import { IconBack, IconClose, IconCoupon, IconDelivery, IconMinus, IconPickup, IconPlus } from '../../components/icons';
 import { api, errorMessage } from '../../lib/api';
 import { type CartLine, subtotalOf } from './cart';
 
@@ -29,11 +30,14 @@ export function Checkout({ menu, lines, onChange, onBack, onPlaced }: Props) {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
-  // Uma chave por tentativa de pedido: reenviar depois de uma falha de rede não cria dois pedidos.
-  const idempotencyKey = useRef<string>(crypto.randomUUID());
+  const [coupon, setCoupon] = useState<CouponPreview | null>(null);
+  const [couponInput, setCouponInput] = useState('');
+  const [couponError, setCouponError] = useState<string | null>(null);
+  // A chave acompanha o conteúdo do pedido: reenviar o mesmo pedido depois de uma falha de rede
+  // usa a mesma chave e não cria dois; mudar qualquer coisa gera uma chave nova.
+  const attempt = useRef<{ body: string; key: string } | null>(null);
 
   const setQuantity = (key: string, quantity: number) => {
-    idempotencyKey.current = crypto.randomUUID();
     onChange(
       quantity <= 0
         ? lines.filter((line) => line.key !== key)
@@ -43,6 +47,30 @@ export function Checkout({ menu, lines, onChange, onBack, onPlaced }: Props) {
 
   const subtotal = subtotalOf(lines);
   const deliveryFee = fulfillment === 'delivery' ? menu.store.deliveryFeeCents : 0;
+  const discount = coupon?.discountCents ?? 0;
+  const couponCode = coupon?.code;
+
+  const applyCoupon = async (code: string) => {
+    try {
+      setCoupon(
+        await api<CouponPreview>(`/v1/stores/${menu.store.slug}/coupons/preview`, {
+          method: 'POST',
+          body: { code, subtotalCents: subtotal },
+        }),
+      );
+      setCouponInput('');
+      setCouponError(null);
+    } catch (failure) {
+      setCoupon(null);
+      setCouponError(errorMessage(failure));
+    }
+  };
+
+  // O desconto depende do valor dos itens: quando o carrinho muda, o cupom é conferido de novo.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: só o subtotal dispara a nova conferência.
+  useEffect(() => {
+    if (couponCode) void applyCoupon(couponCode);
+  }, [subtotal]);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -83,7 +111,11 @@ export function Checkout({ menu, lines, onChange, onBack, onPlaced }: Props) {
             }
           : undefined,
       notes: text('notes') || undefined,
+      couponCode,
     };
+
+    const body = JSON.stringify(input);
+    if (attempt.current?.body !== body) attempt.current = { body, key: crypto.randomUUID() };
 
     setSending(true);
     setError(null);
@@ -91,7 +123,7 @@ export function Checkout({ menu, lines, onChange, onBack, onPlaced }: Props) {
       const order = await api<OrderView>(`/v1/stores/${menu.store.slug}/orders`, {
         method: 'POST',
         body: input,
-        headers: { 'idempotency-key': idempotencyKey.current },
+        headers: { 'idempotency-key': attempt.current.key },
       });
       onPlaced();
       router.push(`/${menu.store.slug}/pedido/${order.id}`);
@@ -256,6 +288,59 @@ export function Checkout({ menu, lines, onChange, onBack, onPlaced }: Props) {
             <input name="notes" maxLength={500} placeholder="Ex.: troco para 100" />
           </label>
 
+          {coupon ? (
+            <p className="applied">
+              <span className="row" style={{ gap: 8 }}>
+                <IconCoupon />
+                Cupom {coupon.code} aplicado
+              </span>
+              <button
+                type="button"
+                className="btn btn-small btn-quiet btn-icon"
+                aria-label="Remover cupom"
+                onClick={() => setCoupon(null)}
+              >
+                <IconClose />
+              </button>
+            </p>
+          ) : (
+            <div className="field">
+              <label htmlFor="coupon" style={{ fontSize: '0.9rem', fontWeight: 600 }}>
+                Cupom de desconto
+              </label>
+              <div className="inline-form">
+                <input
+                  id="coupon"
+                  value={couponInput}
+                  maxLength={24}
+                  autoCapitalize="characters"
+                  spellCheck={false}
+                  onChange={(event) => setCouponInput(event.target.value.toUpperCase())}
+                  onKeyDown={(event) => {
+                    // Enter aqui aplica o cupom, em vez de enviar o pedido.
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      if (couponInput.trim()) void applyCoupon(couponInput);
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={!couponInput.trim()}
+                  onClick={() => applyCoupon(couponInput)}
+                >
+                  Aplicar
+                </button>
+              </div>
+              {couponError ? (
+                <small className="error" role="status">
+                  {couponError}
+                </small>
+              ) : null}
+            </div>
+          )}
+
           <div className="card totals">
             <div>
               <span>Itens</span>
@@ -267,9 +352,15 @@ export function Checkout({ menu, lines, onChange, onBack, onPlaced }: Props) {
                 <span className="tabular">{deliveryFee > 0 ? formatBRL(deliveryFee) : 'Grátis'}</span>
               </div>
             ) : null}
+            {discount > 0 ? (
+              <div>
+                <span>Desconto</span>
+                <span className="tabular">{formatBRL(-discount)}</span>
+              </div>
+            ) : null}
             <div className="total">
               <span>Total</span>
-              <span className="tabular">{formatBRL(subtotal + deliveryFee)}</span>
+              <span className="tabular">{formatBRL(subtotal + deliveryFee - discount)}</span>
             </div>
           </div>
 

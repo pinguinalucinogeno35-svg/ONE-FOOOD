@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { couponCodeSchema, couponDiscount } from './coupons.js';
 import { assertCents, formatBRL, multiplyCents, parseBRL, sumCents } from './money.js';
 import { formatPhoneBR, toE164BR } from './phone.js';
 
@@ -60,5 +61,24 @@ describe('telefone brasileiro', () => {
   it('formata para exibição', () => {
     expect(formatPhoneBR('+5511999990000')).toBe('(11) 99999-0000');
     expect(formatPhoneBR('+551133334444')).toBe('(11) 3333-4444');
+  });
+});
+
+describe('desconto de cupom', () => {
+  it('percentual arredonda para baixo e respeita o teto', () => {
+    expect(couponDiscount({ kind: 'percent', value: 10, maxDiscountCents: null }, 3333)).toBe(333);
+    expect(couponDiscount({ kind: 'percent', value: 50, maxDiscountCents: 1000 }, 5000)).toBe(1000);
+    expect(couponDiscount({ kind: 'percent', value: 100, maxDiscountCents: null }, 4200)).toBe(4200);
+  });
+
+  it('valor fixo nunca passa do valor dos itens', () => {
+    expect(couponDiscount({ kind: 'fixed', value: 1500, maxDiscountCents: null }, 5000)).toBe(1500);
+    expect(couponDiscount({ kind: 'fixed', value: 1500, maxDiscountCents: null }, 900)).toBe(900);
+  });
+
+  it('normaliza o código digitado', () => {
+    expect(couponCodeSchema.parse(' bem vindo10 ')).toBe('BEMVINDO10');
+    expect(couponCodeSchema.safeParse('ab').success).toBe(false);
+    expect(couponCodeSchema.safeParse('com-traço').success).toBe(false);
   });
 });

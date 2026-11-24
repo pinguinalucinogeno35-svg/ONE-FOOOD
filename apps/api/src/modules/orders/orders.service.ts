@@ -9,12 +9,15 @@ import type {
   OrderStatus,
   OrderView,
   PaymentMethod,
+  TrackedOrderView,
 } from '@onefood/shared';
 import { TenantDb, type TenantTx } from '../../platform/db/tenant-db.js';
 import { isUuidV7, newId, timeOfId } from '../../platform/ids.js';
 import { CatalogService } from '../catalog/index.js';
+import { CouponError, CouponsService } from '../coupons/index.js';
 import { Outbox } from '../outbox/index.js';
 import { PricingError, priceOrder } from './pricing.js';
+import { ReviewsService } from './reviews.service.js';
 
 const IDEMPOTENCY_SCOPE = 'order.create';
 
@@ -30,6 +33,8 @@ export class OrdersService {
     @Inject(TenantDb) private readonly db: TenantDb,
     @Inject(CatalogService) private readonly catalog: CatalogService,
     @Inject(Outbox) private readonly outbox: Outbox,
+    @Inject(CouponsService) private readonly coupons: CouponsService,
+    @Inject(ReviewsService) private readonly reviews: ReviewsService,
   ) {}
 
   /**
@@ -97,11 +102,33 @@ export class OrdersService {
       );
       const number = Number(sequence.rows[0]?.value);
 
+      // O desconto vale só sobre os itens, e quem calcula é o servidor.
+      let couponCode: string | null = null;
+      if (input.couponCode) {
+        try {
+          const redeemed = await this.coupons.redeem(tx, {
+            code: input.couponCode,
+            customerId,
+            subtotalCents: priced.subtotalCents,
+            orderId,
+            orderCreatedAt: createdAt,
+          });
+          couponCode = redeemed.code;
+          priced.discountCents = redeemed.discountCents;
+          priced.totalCents = priced.subtotalCents + priced.deliveryFeeCents - redeemed.discountCents;
+        } catch (error) {
+          if (error instanceof CouponError) {
+            throw new UnprocessableEntityException({ error: 'coupon_invalid', problem: error.problem });
+          }
+          throw error;
+        }
+      }
+
       await tx.query(
         `INSERT INTO orders (tenant_id, id, created_at, number, customer_id, channel, fulfillment,
                              payment_method, subtotal_cents, delivery_fee_cents, discount_cents,
-                             total_cents, delivery_address, notes)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+                             total_cents, delivery_address, notes, coupon_code)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
         [
           tenantId,
           orderId,
@@ -117,6 +144,7 @@ export class OrdersService {
           priced.totalCents,
           input.fulfillment === 'delivery' ? JSON.stringify(input.deliveryAddress) : null,
           input.notes ?? null,
+          couponCode,
         ],
       );
 
@@ -177,6 +205,7 @@ export class OrdersService {
         subtotalCents: priced.subtotalCents,
         deliveryFeeCents: priced.deliveryFeeCents,
         discountCents: priced.discountCents,
+        couponCode,
         totalCents: priced.totalCents,
         notes: input.notes ?? null,
         createdAt: createdAt.toISOString(),
@@ -186,11 +215,14 @@ export class OrdersService {
     });
   }
 
-  async get(tenantId: string, orderId: string): Promise<OrderView> {
+  async get(tenantId: string, orderId: string): Promise<TrackedOrderView> {
     if (!isUuidV7(orderId)) throw orderNotFound();
-    const order = await this.db.withTenant(tenantId, (tx) => this.load(tx, orderId));
-    if (!order) throw orderNotFound();
-    return order;
+    const tracked = await this.db.withTenant(tenantId, async (tx) => {
+      const order = await this.load(tx, orderId);
+      return order ? { ...order, review: await this.reviews.find(tx, orderId) } : null;
+    });
+    if (!tracked) throw orderNotFound();
+    return tracked;
   }
 
   private async replay(tx: TenantTx, idempotencyKey: string, requestHash: string): Promise<OrderView> {
@@ -221,9 +253,10 @@ export class OrdersService {
       discount_cents: number;
       total_cents: number;
       notes: string | null;
+      coupon_code: string | null;
     }>(
       `SELECT number, status, channel, fulfillment, payment_method, subtotal_cents,
-              delivery_fee_cents, discount_cents, total_cents, notes
+              delivery_fee_cents, discount_cents, total_cents, notes, coupon_code
          FROM orders WHERE tenant_id = $1 AND id = $2 AND created_at = $3`,
       [tx.tenantId, orderId, createdAt],
     );
@@ -257,6 +290,7 @@ export class OrdersService {
       subtotalCents: row.subtotal_cents,
       deliveryFeeCents: row.delivery_fee_cents,
       discountCents: row.discount_cents,
+      couponCode: row.coupon_code,
       totalCents: row.total_cents,
       notes: row.notes,
       createdAt: createdAt.toISOString(),

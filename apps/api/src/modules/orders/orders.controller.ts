@@ -1,5 +1,5 @@
 import { BadRequestException, Body, Controller, Get, Headers, Inject, Param, Post, Req, Res } from '@nestjs/common';
-import { createOrderSchema, type OrderView } from '@onefood/shared';
+import { createOrderSchema, type OrderView, type TrackedOrderView } from '@onefood/shared';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { Config } from '../../config.js';
 import { parseBody } from '../../platform/http/validation.js';
@@ -48,7 +48,7 @@ export class OrdersController {
 
   /** Acompanhamento pelo cliente. O id do pedido é a credencial: só quem pediu o conhece. */
   @Get(':orderId')
-  async get(@Param('slug') slug: string, @Param('orderId') orderId: string): Promise<OrderView> {
+  async get(@Param('slug') slug: string, @Param('orderId') orderId: string): Promise<TrackedOrderView> {
     const tenantId = await this.tenants.resolveSlug(slug);
     return this.orders.get(tenantId, orderId);
   }

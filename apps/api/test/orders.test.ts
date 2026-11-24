@@ -64,7 +64,7 @@ describe('pedidos', () => {
 
     const fetched = await app.inject({ method: 'GET', url: `/v1/stores/${store.slug}/orders/${order.id}` });
     expect(fetched.statusCode).toBe(200);
-    expect(fetched.json()).toEqual(order);
+    expect(fetched.json()).toEqual({ ...order, review: null });
   });
 
   it('grava pedido, evento, pagamento pendente e outbox na mesma transação', async () => {
