@@ -96,3 +96,36 @@ export interface OrderView {
   createdAt: string;
   items: OrderItemView[];
 }
+
+/**
+ * Para onde um pedido pode ir a partir do estado atual. Pedido de entrega sai para entrega
+ * antes de ser concluído; retirada e consumo no local concluem direto.
+ */
+export function allowedTransitions(status: OrderStatus, fulfillment: Fulfillment): OrderStatus[] {
+  switch (status) {
+    case 'pending':
+      return ['confirmed', 'cancelled'];
+    case 'confirmed':
+      return ['preparing', 'cancelled'];
+    case 'preparing':
+      return ['ready', 'cancelled'];
+    case 'ready':
+      return fulfillment === 'delivery' ? ['out_for_delivery', 'cancelled'] : ['completed', 'cancelled'];
+    case 'out_for_delivery':
+      return ['completed', 'cancelled'];
+    default:
+      return [];
+  }
+}
+
+export function isOpenStatus(status: OrderStatus): boolean {
+  return status !== 'completed' && status !== 'cancelled';
+}
+
+export const updateOrderStatusSchema = z.object({ status: z.enum(ORDER_STATUSES) });
+
+/** Pedido como o restaurante vê no painel: inclui quem pediu e para onde vai. */
+export interface PanelOrderView extends OrderView {
+  customer: { name: string; phone: string };
+  deliveryAddress: DeliveryAddress | null;
+}

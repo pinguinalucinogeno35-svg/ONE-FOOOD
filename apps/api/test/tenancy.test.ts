@@ -38,7 +38,7 @@ describe('isolamento entre tenants (Row Level Security)', () => {
                        WHERE a.attrelid = c.oid AND a.attname = 'tenant_id' AND NOT a.attisdropped) AS has_tenant
          FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
         WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p') AND NOT c.relispartition
-          AND c.relname NOT IN ('schema_migrations', 'tenants')`,
+          AND c.relname NOT IN ('schema_migrations', 'tenants', 'users', 'sessions')`,
     );
     expect(rows.length).toBeGreaterThanOrEqual(12);
     expect(rows.filter((row) => !row.rls || !row.has_tenant)).toEqual([]);
@@ -107,6 +107,16 @@ describe('isolamento entre tenants (Row Level Security)', () => {
       expect(afterFailure.rows[0]?.visible).toBe('0');
     } finally {
       await single.end();
+    }
+  });
+
+  it('usuários e sessões são inacessíveis à aplicação fora das funções de identidade', async () => {
+    for (const table of ['users', 'sessions']) {
+      await expect(pool.query(`SELECT 1 FROM ${table} LIMIT 1`), table).rejects.toThrow(/permission denied/);
+      await expect(
+        db.withTenant(a.tenantId, (tx) => tx.query(`SELECT 1 FROM ${table} LIMIT 1`)),
+        table,
+      ).rejects.toThrow(/permission denied/);
     }
   });
 

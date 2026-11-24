@@ -5,6 +5,7 @@ import pg from 'pg';
 import { type Config, loadConfig } from '../config.js';
 import { PartitionsService } from './db/partitions.service.js';
 import { TenantDb } from './db/tenant-db.js';
+import { RateLimiter } from './rate-limit/rate-limiter.js';
 import { TenantsService } from './tenants/tenants.service.js';
 import { APP_POOL, CONFIG, REDIS_CACHE, REDIS_QUEUE, RELAY_POOL } from './tokens.js';
 
@@ -66,8 +67,19 @@ function createPool(connectionString: string, max: number, name: string): pg.Poo
     TenantDb,
     TenantsService,
     PartitionsService,
+    RateLimiter,
   ],
-  exports: [CONFIG, APP_POOL, RELAY_POOL, REDIS_QUEUE, REDIS_CACHE, TenantDb, TenantsService, PartitionsService],
+  exports: [
+    CONFIG,
+    APP_POOL,
+    RELAY_POOL,
+    REDIS_QUEUE,
+    REDIS_CACHE,
+    TenantDb,
+    TenantsService,
+    PartitionsService,
+    RateLimiter,
+  ],
 })
 export class PlatformModule implements OnApplicationShutdown {
   constructor(

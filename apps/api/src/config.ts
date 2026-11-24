@@ -11,6 +11,22 @@ const schema = z.object({
   REDIS_QUEUE_URL: z.url(),
   REDIS_CACHE_URL: z.url(),
   REALTIME_TOKEN_SECRET: z.string().min(32, 'use um segredo de pelo menos 32 caracteres'),
+  /** Endereço público do servidor de tempo real, entregue ao painel junto com o token. */
+  REALTIME_PUBLIC_URL: z.url().default('ws://localhost:3001/ws'),
+  /** Origem do site. Requisições autenticadas que alteram dados só valem vindas daqui. */
+  WEB_ORIGIN: z.url().default('http://localhost:3100'),
+  /**
+   * Quantos proxies confiáveis ficam na frente da API (balanceador, CDN). Com 0, o IP do
+   * cliente é o da conexão. Um valor maior que o real deixa o cliente forjar o próprio IP
+   * e escapar dos limites por IP.
+   */
+  TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).default(0),
+  SESSION_TTL_DAYS: z.coerce.number().int().min(1).max(90).default(30),
+  // Limites de uso. 0 desliga o limite (útil no teste de carga em homologação).
+  SIGNUP_LIMIT_PER_IP_HOUR: z.coerce.number().int().min(0).default(5),
+  LOGIN_LIMIT_PER_ACCOUNT_15MIN: z.coerce.number().int().min(0).default(10),
+  ORDER_LIMIT_PER_IP_10MIN: z.coerce.number().int().min(0).default(30),
+  ORDER_LIMIT_PER_STORE_MIN: z.coerce.number().int().min(0).default(3000),
 });
 
 export type Config = z.infer<typeof schema>;

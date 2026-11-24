@@ -4,8 +4,9 @@ Plataforma de delivery e gestão para restaurantes. Este repositório é a **Fas
 [plano de engenharia e escalonamento](https://claude.ai/artifact/PwGXZ8i2iSXZM8AtW6o6y7): a base de código,
 o modelo de dados central e as regras de banco que valem desde o primeiro dia, provadas por testes.
 
-Ainda não há funcionalidade de produto além de um fluxo de ponta a ponta que exercita a arquitetura:
-cardápio público, criação de pedido e aviso em tempo real.
+A **Fase 1 (Delivery)** está em andamento. Já funciona de ponta a ponta, sem fornecedores externos: o
+restaurante cria a conta, monta o cardápio e opera os pedidos num painel ao vivo; o cliente pede pelo
+cardápio público, sem app e sem login, e acompanha o pedido.
 
 ## Como rodar
 
@@ -53,8 +54,9 @@ pnpm dev:realtime
 pnpm dev:web
 ```
 
-- Cardápio pela API: http://localhost:3000/v1/stores/demo/menu
-- Cardápio no navegador: http://localhost:3100/demo
+- Criar uma loja: http://localhost:3100/cadastro
+- Cardápio de demonstração: http://localhost:3100/demo
+- Painel: http://localhost:3100/painel
 
 Outros comandos: `pnpm test` (precisa dos serviços no ar), `pnpm lint`, `pnpm format`, `pnpm typecheck`.
 
@@ -63,9 +65,9 @@ Outros comandos: `pnpm test` (precisa dos serviços no ar), `pnpm lint`, `pnpm f
 ```
 apps/api        Backend: um código, três processos (API, workers, tempo real)
   src/platform    Infraestrutura comum: configuração, banco com contexto de tenant, Redis, saúde
-  src/modules     Módulos de negócio: catalog, orders, outbox, realtime
+  src/modules     Módulos de negócio: identity, catalog, orders, outbox, realtime
   test            Testes de integração contra Postgres, PgBouncer e Redis de verdade
-apps/web        Next.js: cardápio público
+apps/web        Next.js: cardápio com carrinho, acompanhamento do pedido e painel do restaurante
 packages/shared Tipos e validações compartilhados entre backend e web; dinheiro em centavos
 db/migrations   Migrações SQL, aplicadas em ordem por `pnpm db:migrate`
 infra/pgbouncer PgBouncer em modo transação, igual ao de produção
@@ -86,6 +88,74 @@ interface pública (`index.ts`) ou por evento. `test/architecture.test.ts` falha
 
 Nada que dependa de terceiros roda dentro da requisição. WhatsApp, Pix, impressão e nota fiscal entram
 na Fase 1 como novos consumidores do mesmo evento.
+
+## API
+
+Público, sem login:
+
+| Rota                              | O que faz                               |
+| --------------------------------- | --------------------------------------- |
+| `GET /v1/stores/:slug/menu`       | Cardápio da loja                        |
+| `POST /v1/stores/:slug/orders`    | Cria o pedido (exige `Idempotency-Key`) |
+| `GET /v1/stores/:slug/orders/:id` | Acompanhamento do pedido pelo cliente   |
+
+Conta:
+
+| Rota                                          | O que faz                                        |
+| --------------------------------------------- | ------------------------------------------------ |
+| `POST /v1/auth/signup`                        | Cria a conta e o restaurante, e já abre a sessão |
+| `POST /v1/auth/login`, `POST /v1/auth/logout` | Abre e encerra a sessão                          |
+| `GET /v1/auth/me`                             | Usuário e restaurantes a que tem acesso          |
+
+Painel do restaurante, em `/v1/panel/stores/:slug` (exige sessão e vínculo com a loja):
+
+| Rota                                        | O que faz                                           | Quem          |
+| ------------------------------------------- | --------------------------------------------------- | ------------- |
+| `GET /menu`                                 | Cardápio completo, com itens desativados            | todos         |
+| `PATCH /`                                   | Nome da loja e taxa de entrega                      | dono, gerente |
+| `POST /categories`, `PATCH /categories/:id` | Categorias                                          | dono, gerente |
+| `POST /products`, `PATCH /products/:id`     | Produtos                                            | dono, gerente |
+| `PUT /products/:id/option-groups`           | Substitui os grupos de opções do produto            | dono, gerente |
+| `GET /orders?scope=open\|recent`            | Pedidos em andamento ou encerrados nas últimas 24 h | todos         |
+| `POST /orders/:id/status`                   | Avança ou cancela o pedido                          | todos         |
+| `POST /realtime-token`                      | Token de 60 s para a conexão de tempo real          | todos         |
+
+Estados do pedido: `pending` → `confirmed` → `preparing` → `ready` → `completed`. Pedido de entrega passa por
+`out_for_delivery` antes de concluir. Qualquer estado em aberto pode ir para `cancelled`.
+
+## Telas
+
+| Endereço                 | O que é                                               |
+| ------------------------ | ----------------------------------------------------- |
+| `/cadastro`, `/entrar`   | Criar a loja e entrar no painel                       |
+| `/:slug`                 | Cardápio público com carrinho e finalização do pedido |
+| `/:slug/pedido/:id`      | Acompanhamento do pedido pelo cliente                 |
+| `/painel/:slug/pedidos`  | Quadro de pedidos ao vivo                             |
+| `/painel/:slug/cardapio` | Categorias, produtos e opções                         |
+| `/painel/:slug/loja`     | Nome da loja e taxa de entrega                        |
+
+- **O navegador fala só com o site.** `app/api/[...path]/route.ts` repassa as chamadas para a API, então o
+  cookie de sessão é do próprio site e não há requisição entre origens.
+- **Cardápio em cache.** A página do cardápio é guardada por 60 segundos e descartada na hora quando o
+  restaurante altera algo no painel.
+- **Ícones próprios.** `components/icons.tsx` é o único conjunto de ícones; nenhum emoji ou caractere faz
+  papel de ícone.
+- **Pix fora da finalização.** O cliente escolhe dinheiro ou cartão na entrega até a integração de Pix existir.
+
+## Segurança de acesso
+
+- **Sessão em cookie** `HttpOnly` e `SameSite=Lax`. O banco guarda só o hash do token; sair encerra a sessão
+  no servidor.
+- **Senhas** com scrypt. Login responde igual para senha errada e e-mail desconhecido.
+- **O tenant vem do vínculo, não do cliente.** Em rotas do painel, o restaurante da URL só vale se o usuário da
+  sessão for membro dele; quem não é recebe o mesmo 404 de loja inexistente.
+- **Usuários e sessões fechados no banco.** A aplicação não tem acesso direto a essas tabelas, só às funções
+  `app.*` de identidade.
+- **Limites de uso** no Redis de cache: cadastro e pedidos por IP, tentativas de login por conta, pedidos por
+  loja. Se o Redis cair, o limite deixa passar em vez de parar os pedidos.
+- **IP do cliente.** `TRUST_PROXY_HOPS` diz quantos proxies confiáveis há na frente da API. Com o valor errado,
+  o limite por IP conta o IP do balanceador ou aceita IP forjado. O site também é um salto: em produção, os
+  pedidos chegam à API pelo servidor do site, que precisa entrar nessa conta junto com o balanceador.
 
 ## As sete regras do banco
 
@@ -131,8 +201,13 @@ O teste só vale como critério quando roda contra o ambiente de homologação, 
 
 - **Infraestrutura como código e deploy.** Dependem da escolha do provedor de nuvem, que o plano deixa em
   cotação. A imagem do backend (`Dockerfile`) já serve aos três processos e às migrações.
-- **Autenticação e painel do restaurante.** O servidor de tempo real já exige um token assinado por tenant;
-  quem emite esse token é o login do painel, na Fase 1.
-- **Limite de requisições por tenant e proteção contra pedido falso.** Fase 1, junto com o lançamento público.
+- **Testes automatizados das telas.** O fluxo foi conferido num navegador de verdade, mas ainda não há teste
+  de ponta a ponta no CI. O backend tem.
+- **Confirmação de e-mail, recuperação de senha e convite de equipe.** Dependem de um provedor de e-mail.
+  Os papéis gerente e funcionário já existem no banco, mas só o dono é criado pelo cadastro.
+- **Dois fatores para donos.** Previsto no plano, ainda não implementado.
+- **Pix, WhatsApp e impressão.** Dependem da escolha dos provedores. Entram como consumidores dos eventos
+  `order.created` e `order.status_changed`.
+- **Confirmação de telefone no primeiro pedido.** Hoje a proteção contra pedido falso é só o limite por IP.
 - **Identidade visual.** O app web usa um estilo provisório.
 - **Aplicativos (garçom, entregador, SmartPOS).** Fase 2.

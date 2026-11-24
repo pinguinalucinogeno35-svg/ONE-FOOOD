@@ -30,6 +30,36 @@ export async function createStore(app: INestApplicationContext, withMenu = true)
   return { tenantId, slug, menu };
 }
 
+export interface PanelStore extends TestStore {
+  cookie: string;
+  email: string;
+  password: string;
+}
+
+/** Cria conta e restaurante pelo cadastro self-service e devolve o cookie de sessão do dono. */
+export async function signupStore(app: NestFastifyApplication, withMenu = true): Promise<PanelStore> {
+  const unique = newId().replace(/-/g, '').slice(-16);
+  const slug = `loja-${unique}`;
+  const email = `dono-${unique}@exemplo.com.br`;
+  const password = 'senha-de-teste-123';
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/auth/signup',
+    payload: { name: 'Dona Ana', email, password, storeName: `Loja ${slug}`, storeSlug: slug },
+  });
+  if (res.statusCode !== 201) throw new Error(`cadastro falhou: ${res.statusCode} ${res.body}`);
+  const tenantId = await app.get(TenantsService).resolveSlug(slug);
+  const menu = withMenu ? await app.get(TenantDb).withTenant(tenantId, insertDemoMenu) : ({} as DemoMenu);
+  return { tenantId, slug, menu, cookie: sessionCookie(res.headers['set-cookie']), email, password };
+}
+
+/** Extrai "nome=valor" do cabeçalho Set-Cookie, pronto para o cabeçalho Cookie. */
+export function sessionCookie(header: string | string[] | undefined): string {
+  const value = Array.isArray(header) ? header[0] : header;
+  if (!value) throw new Error('resposta sem Set-Cookie');
+  return value.split(';')[0] as string;
+}
+
 export function orderBody(store: TestStore, overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     customer: { name: 'Maria Souza', phone: '+5511999990000' },
