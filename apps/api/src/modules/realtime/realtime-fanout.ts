@@ -24,6 +24,10 @@ export class RealtimeFanout implements OnModuleInit {
       const message: RealtimeMessage<'order.created'> = { type: 'order.created', data: event.payload };
       await this.redis.publish(realtimeChannel(event.tenantId), JSON.stringify(message));
     });
+    this.consumers.on('review.created', 'realtime', async (event) => {
+      const message: RealtimeMessage<'review.created'> = { type: 'review.created', data: event.payload };
+      await this.redis.publish(realtimeChannel(event.tenantId), JSON.stringify(message));
+    });
     this.consumers.on('order.status_changed', 'realtime', async (event) => {
       const message: RealtimeMessage<'order.status_changed'> = { type: 'order.status_changed', data: event.payload };
       await this.redis.publish(realtimeChannel(event.tenantId), JSON.stringify(message));

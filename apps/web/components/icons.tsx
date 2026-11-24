@@ -116,3 +116,31 @@ export const IconLive = (props: IconProps) => (
     <path d="M7.5 7.5a6.4 6.4 0 000 9M16.5 7.5a6.4 6.4 0 010 9" />
   </Icon>
 );
+
+/**
+ * Estrela de avaliação própria: cinco pontas com as facetas marcadas do centro às reentrâncias.
+ * `filled` preenche a estrela para as notas já dadas.
+ */
+export const IconStar = ({ filled, ...props }: IconProps & { filled?: boolean }) => (
+  <Icon {...props} fill={filled ? 'currentColor' : 'none'}>
+    <path d="M12 3.6l2.5 5.3 5.7.7-4.2 4 1.1 5.8L12 16.6l-5.1 2.8 1.1-5.8-4.2-4 5.7-.7L12 3.6z" />
+    {filled ? null : <path d="M12 12V7.4M12 12l4 1.3M12 12l-4 1.3M12 12l2.4 3.6M12 12l-2.4 3.6" strokeWidth="1" />}
+  </Icon>
+);
+
+/** Cupom: bilhete com os dois recortes laterais e a linha de destacar. */
+export const IconCoupon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M4 7.5h16v3a1.5 1.5 0 000 3v3H4v-3a1.5 1.5 0 000-3v-3z" />
+    <path d="M14.5 8v1.2M14.5 11.4v1.2M14.5 14.8V16" />
+  </Icon>
+);
+
+/** Aviso que pede atenção: triângulo com a haste e o ponto. */
+export const IconAlert = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M12 4.5l8.5 14.5h-17L12 4.5z" />
+    <path d="M12 10v4" />
+    <circle cx="12" cy="16.4" r="0.6" fill="currentColor" stroke="none" />
+  </Icon>
+);

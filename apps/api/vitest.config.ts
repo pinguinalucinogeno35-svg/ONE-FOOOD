@@ -15,6 +15,8 @@ const env = {
   // Todos os testes saem do mesmo IP; os limites por IP são testados à parte.
   SIGNUP_LIMIT_PER_IP_HOUR: '0',
   ORDER_LIMIT_PER_IP_10MIN: '0',
+  COUPON_PREVIEW_LIMIT_PER_IP_10MIN: '0',
+  REVIEW_LIMIT_PER_IP_10MIN: '0',
 };
 for (const [key, value] of Object.entries(env)) {
   if (key.startsWith('DATABASE_') || key.startsWith('REDIS_')) process.env[key] ??= value;

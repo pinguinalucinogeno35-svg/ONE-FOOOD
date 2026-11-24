@@ -1,8 +1,24 @@
 'use client';
 
-import { allowedTransitions, formatBRL, formatPhoneBR, type OrderStatus, type PanelOrderView } from '@onefood/shared';
+import {
+  allowedTransitions,
+  formatBRL,
+  formatPhoneBR,
+  type OrderStatus,
+  type PanelOrderView,
+  type RealtimeMessage,
+} from '@onefood/shared';
+import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { IconClock, IconDelivery, IconLive, IconPickup } from '../../../../components/icons';
+import {
+  IconAlert,
+  IconClock,
+  IconClose,
+  IconCoupon,
+  IconDelivery,
+  IconLive,
+  IconPickup,
+} from '../../../../components/icons';
 import { ApiError, api, errorMessage } from '../../../../lib/api';
 import {
   ACTION_LABEL,
@@ -32,6 +48,8 @@ export default function OrdersPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  // Notas baixas que chegaram enquanto o painel estava aberto.
+  const [lowRatings, setLowRatings] = useState<Array<{ orderId: string; number: number; rating: number }>>([]);
   const showClosed = useRef(false);
 
   const base = `/v1/panel/stores/${store.slug}`;
@@ -70,7 +88,23 @@ export default function OrdersPage() {
           setLive(true);
           void refresh();
         };
-        socket.onmessage = () => void refresh();
+        socket.onmessage = (event) => {
+          try {
+            const message = JSON.parse(String(event.data)) as RealtimeMessage;
+            if (message.type === 'review.created') {
+              const review = (message as RealtimeMessage<'review.created'>).data;
+              if (review.low) {
+                setLowRatings((current) =>
+                  current.some((item) => item.orderId === review.orderId) ? current : [...current, review],
+                );
+              }
+              return;
+            }
+          } catch {
+            // Mensagem que não deu para ler: relê a lista do mesmo jeito.
+          }
+          void refresh();
+        };
         socket.onclose = () => {
           setLive(false);
           schedule();
@@ -132,6 +166,23 @@ export default function OrdersPage() {
           {error}
         </p>
       ) : null}
+      {lowRatings.map((review) => (
+        <div key={review.orderId} className="banner" role="alert" style={{ marginBottom: 16 }}>
+          <IconAlert />
+          <span>
+            Nota baixa no pedido {review.number}: {review.rating} de 5.{' '}
+            <Link href={`/painel/${store.slug}/avaliacoes`}>Ver avaliações</Link>
+          </span>
+          <button
+            type="button"
+            className="btn btn-small btn-quiet btn-icon"
+            aria-label={`Dispensar aviso do pedido ${review.number}`}
+            onClick={() => setLowRatings((current) => current.filter((item) => item.orderId !== review.orderId))}
+          >
+            <IconClose />
+          </button>
+        </div>
+      ))}
 
       {orders === null ? (
         <p className="muted">Carregando.</p>
@@ -245,6 +296,12 @@ function OrderCard({
         <p className="muted">
           {address.street}, {address.number}
           {address.complement ? `, ${address.complement}` : ''} · {address.district}, {address.city}
+        </p>
+      ) : null}
+      {order.couponCode ? (
+        <p className="row muted" style={{ gap: 6 }}>
+          <IconCoupon width={16} height={16} />
+          Cupom {order.couponCode}: {formatBRL(-order.discountCents)}
         </p>
       ) : null}
       <p className="row between">

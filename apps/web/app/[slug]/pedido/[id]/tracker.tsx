@@ -1,22 +1,23 @@
 'use client';
 
-import { formatBRL, isOpenStatus, type OrderStatus, type OrderView } from '@onefood/shared';
+import { formatBRL, isOpenStatus, type OrderStatus, type TrackedOrderView } from '@onefood/shared';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { IconBack, IconDone } from '../../../../components/icons';
 import { ApiError, api, errorMessage } from '../../../../lib/api';
 import { PAYMENT_LABEL, STATUS_LABEL, timeOf } from '../../../../lib/labels';
+import { ReviewForm } from './review-form';
 
 const POLL_MS = 10_000;
 
-function stepsFor(order: OrderView): OrderStatus[] {
+function stepsFor(order: TrackedOrderView): OrderStatus[] {
   return order.fulfillment === 'delivery'
     ? ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'completed']
     : ['pending', 'confirmed', 'preparing', 'ready', 'completed'];
 }
 
 export function OrderTracker({ slug, orderId }: { slug: string; orderId: string }) {
-  const [order, setOrder] = useState<OrderView | null>(null);
+  const [order, setOrder] = useState<TrackedOrderView | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -25,7 +26,7 @@ export function OrderTracker({ slug, orderId }: { slug: string; orderId: string 
 
     const load = async () => {
       try {
-        const current = await api<OrderView>(`/v1/stores/${slug}/orders/${orderId}`);
+        const current = await api<TrackedOrderView>(`/v1/stores/${slug}/orders/${orderId}`);
         if (!active) return;
         setOrder(current);
         setError(null);
@@ -83,6 +84,10 @@ export function OrderTracker({ slug, orderId }: { slug: string; orderId: string 
         )}
       </section>
 
+      {order.status === 'completed' ? (
+        <ReviewForm slug={slug} order={order} onReviewed={(review) => setOrder({ ...order, review })} />
+      ) : null}
+
       <h2>Itens</h2>
       <ul className="list">
         {order.items.map((item) => (
@@ -107,6 +112,12 @@ export function OrderTracker({ slug, orderId }: { slug: string; orderId: string 
           <div>
             <span>Entrega</span>
             <span className="tabular">{order.deliveryFeeCents > 0 ? formatBRL(order.deliveryFeeCents) : 'Grátis'}</span>
+          </div>
+        ) : null}
+        {order.discountCents > 0 ? (
+          <div>
+            <span>Desconto{order.couponCode ? ` (${order.couponCode})` : ''}</span>
+            <span className="tabular">{formatBRL(-order.discountCents)}</span>
           </div>
         ) : null}
         <div className="total">

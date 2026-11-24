@@ -53,6 +53,21 @@ const MESSAGES: Record<string, string> = {
   invalid_transition: 'Este pedido já mudou de etapa. A lista foi atualizada.',
   category_not_found: 'Categoria não encontrada.',
   product_not_found: 'Produto não encontrado.',
+  coupon_code_taken: 'Já existe um cupom com este código.',
+  coupon_not_found: 'Cupom não encontrado.',
+  review_not_available: 'Este pedido ainda não pode ser avaliado.',
+  already_reviewed: 'Este pedido já foi avaliado.',
+  idempotency_key_reused: 'Este pedido já foi enviado. Atualize a página para conferir.',
+};
+
+const COUPON_MESSAGES: Record<string, string> = {
+  not_found: 'Cupom não encontrado. Confira o código.',
+  inactive: 'Este cupom não está mais valendo.',
+  not_started: 'Este cupom ainda não começou a valer.',
+  expired: 'Este cupom já venceu.',
+  min_order: 'O pedido não atinge o valor mínimo deste cupom.',
+  exhausted: 'Este cupom já esgotou.',
+  already_used: 'Você já usou este cupom.',
 };
 
 export function errorMessage(error: unknown): string {
@@ -61,6 +76,9 @@ export function errorMessage(error: unknown): string {
       const problems = error.body.problems as Array<{ path: string; detail: string }> | undefined;
       const first = problems?.[0];
       return first ? `Confira o campo ${first.path}: ${first.detail}.` : 'Confira os dados e tente de novo.';
+    }
+    if (error.code === 'coupon_invalid') {
+      return COUPON_MESSAGES[String(error.body.problem)] ?? 'Este cupom não vale para este pedido.';
     }
     return MESSAGES[error.code] ?? 'Algo deu errado. Tente de novo.';
   }

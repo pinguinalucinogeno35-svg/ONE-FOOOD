@@ -12,6 +12,7 @@ import {
 } from '@onefood/shared';
 import { TenantDb, type TenantTx } from '../../platform/db/tenant-db.js';
 import { isUuidV7, newId, timeOfId } from '../../platform/ids.js';
+import { CouponsService } from '../coupons/index.js';
 import { Outbox } from '../outbox/index.js';
 
 export type OrderScope = 'open' | 'recent';
@@ -29,13 +30,15 @@ interface OrderRow {
   discount_cents: number;
   total_cents: number;
   notes: string | null;
+  coupon_code: string | null;
   delivery_address: DeliveryAddress | null;
   customer_name: string;
   customer_phone: string;
 }
 
 const ORDER_COLUMNS = `o.id, o.created_at, o.number, o.status, o.channel, o.fulfillment, o.payment_method,
-  o.subtotal_cents, o.delivery_fee_cents, o.discount_cents, o.total_cents, o.notes, o.delivery_address,
+  o.subtotal_cents, o.delivery_fee_cents, o.discount_cents, o.total_cents, o.notes, o.coupon_code,
+  o.delivery_address,
   c.name AS customer_name, c.phone AS customer_phone`;
 const ORDER_FROM = 'orders o JOIN customers c ON c.tenant_id = o.tenant_id AND c.id = o.customer_id';
 
@@ -45,6 +48,7 @@ export class PanelOrdersService {
   constructor(
     @Inject(TenantDb) private readonly db: TenantDb,
     @Inject(Outbox) private readonly outbox: Outbox,
+    @Inject(CouponsService) private readonly coupons: CouponsService,
   ) {}
 
   /**
@@ -114,6 +118,7 @@ export class PanelOrdersService {
               WHERE tenant_id = $1 AND order_id = $2 AND status = 'pending'`,
             [tenantId, orderId],
           );
+          await this.coupons.release(tx, orderId);
         }
         // Dinheiro e cartão na entrega são recebidos na conclusão. Pix só muda com o aviso do provedor.
         if (target === 'completed' && row.payment_method !== 'pix') {
@@ -186,6 +191,7 @@ export class PanelOrdersService {
       subtotalCents: row.subtotal_cents,
       deliveryFeeCents: row.delivery_fee_cents,
       discountCents: row.discount_cents,
+      couponCode: row.coupon_code,
       totalCents: row.total_cents,
       notes: row.notes,
       createdAt: row.created_at.toISOString(),

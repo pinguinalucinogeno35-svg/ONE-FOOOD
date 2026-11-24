@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { couponCodeSchema } from './coupons.js';
+import type { OrderReviewView } from './reviews.js';
 
 export const ORDER_STATUSES = [
   'pending',
@@ -56,6 +58,7 @@ export const createOrderSchema = z
     items: z.array(createOrderItemSchema).min(1).max(100),
     deliveryAddress: deliveryAddressSchema.optional(),
     notes: z.string().trim().max(500).optional(),
+    couponCode: couponCodeSchema.optional(),
   })
   .refine((order) => order.fulfillment !== 'delivery' || order.deliveryAddress !== undefined, {
     path: ['deliveryAddress'],
@@ -91,10 +94,17 @@ export interface OrderView {
   subtotalCents: number;
   deliveryFeeCents: number;
   discountCents: number;
+  /** Cupom que gerou o desconto, se houve. */
+  couponCode: string | null;
   totalCents: number;
   notes: string | null;
   createdAt: string;
   items: OrderItemView[];
+}
+
+/** Pedido como o cliente acompanha: inclui a avaliação que ele deixou, se já avaliou. */
+export interface TrackedOrderView extends OrderView {
+  review: OrderReviewView | null;
 }
 
 /**

@@ -27,6 +27,8 @@ const schema = z.object({
   LOGIN_LIMIT_PER_ACCOUNT_15MIN: z.coerce.number().int().min(0).default(10),
   ORDER_LIMIT_PER_IP_10MIN: z.coerce.number().int().min(0).default(30),
   ORDER_LIMIT_PER_STORE_MIN: z.coerce.number().int().min(0).default(3000),
+  COUPON_PREVIEW_LIMIT_PER_IP_10MIN: z.coerce.number().int().min(0).default(20),
+  REVIEW_LIMIT_PER_IP_10MIN: z.coerce.number().int().min(0).default(20),
 });
 
 export type Config = z.infer<typeof schema>;

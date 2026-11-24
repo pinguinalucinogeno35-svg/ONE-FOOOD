@@ -33,6 +33,8 @@ const env = {
   // Todos os testes saem do mesmo IP.
   SIGNUP_LIMIT_PER_IP_HOUR: '0',
   ORDER_LIMIT_PER_IP_10MIN: '0',
+  COUPON_PREVIEW_LIMIT_PER_IP_10MIN: '0',
+  REVIEW_LIMIT_PER_IP_10MIN: '0',
 };
 
 const children = [];
