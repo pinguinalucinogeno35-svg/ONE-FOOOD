@@ -1,6 +1,7 @@
 export * from './catalog.js';
 export * from './catalog-admin.js';
 export * from './coupons.js';
+export * from './delivery.js';
 export * from './events.js';
 export * from './identity.js';
 export * from './money.js';

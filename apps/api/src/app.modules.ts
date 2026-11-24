@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { CatalogModule } from './modules/catalog/index.js';
 import { CouponsModule } from './modules/coupons/index.js';
+import { DeliveryModule } from './modules/delivery/index.js';
 import { IdentityModule } from './modules/identity/index.js';
 import { OrdersModule } from './modules/orders/index.js';
 import { OutboxWorkerModule } from './modules/outbox/index.js';
@@ -15,7 +16,7 @@ import { PlatformModule } from './platform/platform.module.js';
 
 /** API: só o que precisa ser imediato. Nada aqui espera por terceiros. */
 @Module({
-  imports: [PlatformModule, IdentityModule, CatalogModule, CouponsModule, OrdersModule],
+  imports: [PlatformModule, IdentityModule, CatalogModule, CouponsModule, DeliveryModule, OrdersModule],
   controllers: [HealthController],
 })
 export class ApiModule {}
