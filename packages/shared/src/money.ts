@@ -34,3 +34,17 @@ export function formatBRL(cents: Cents): string {
   const centavos = (abs % 100).toString().padStart(2, '0');
   return `${sign}R$ ${reais},${centavos}`;
 }
+
+/**
+ * Lê um valor digitado em reais ("45", "45,5", "1.234,56", "R$ 7,00") e devolve centavos.
+ * Devolve null se não for um valor válido. Ponto é separador de milhar; vírgula, de centavos.
+ */
+export function parseBRL(input: string): Cents | null {
+  const cleaned = input.replace(/R\$/i, '').replace(/\s/g, '');
+  const match = /^(\d{1,3}(?:\.\d{3})+|\d+)(?:,(\d{1,2}))?$/.exec(cleaned);
+  if (!match) return null;
+  const reais = Number((match[1] as string).replace(/\./g, ''));
+  const centavos = Number((match[2] ?? '0').padEnd(2, '0'));
+  const total = reais * 100 + centavos;
+  return Number.isSafeInteger(total) ? total : null;
+}
