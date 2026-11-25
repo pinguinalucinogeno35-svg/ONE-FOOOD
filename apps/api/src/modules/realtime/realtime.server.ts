@@ -54,7 +54,7 @@ export class RealtimeServer implements OnApplicationShutdown {
     const http = this.http;
     await new Promise<void>((resolve, reject) => {
       http.once('error', reject);
-      http.listen(port, '0.0.0.0', resolve);
+      http.listen(port, this.config.HOST, resolve);
     });
     return (http.address() as AddressInfo).port;
   }

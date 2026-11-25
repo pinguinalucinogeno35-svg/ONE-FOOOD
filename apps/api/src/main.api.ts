@@ -20,7 +20,7 @@ async function main(): Promise<void> {
   app.useLogger(app.get(Logger));
   app.enableShutdownHooks();
 
-  await app.listen(config.PORT, '0.0.0.0');
+  await app.listen(config.PORT, config.HOST);
 }
 
 main().catch((error) => {

@@ -105,8 +105,31 @@ jobs:
             const fs = require('node:fs');
             const files = fs.readdirSync(process.env.MIGRATIONS_DIR);
             if (files.length === 0) throw new Error('sem migrações na imagem');
-            for (const entry of ['main.api.js', 'main.worker.js', 'main.realtime.js', 'migrate.js', 'telemetry.js']) {
+            const entries = ['main.api.js', 'main.worker.js', 'main.realtime.js', 'migrate.js', 'release.js', 'telemetry.js'];
+            for (const entry of entries) {
               if (!fs.existsSync('dist/' + entry)) throw new Error('faltou dist/' + entry);
             }
             console.log('ok:', files.length, 'migrações');
           "
+
+  imagem-site:
+    name: Imagem do site
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build da imagem
+        run: docker build -f Dockerfile.web -t onefood-web:${{ github.sha }} .
+      # Sem API por perto, as páginas que não dependem dela ainda têm de responder.
+      - name: A imagem sobe e serve a página de entrada
+        run: |
+          docker run -d --name web -p 3100:3100 onefood-web:${{ github.sha }}
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://localhost:3100/entrar | grep -q 'Entrar'; then
+              echo "ok na tentativa $attempt"
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs web
+          exit 1
