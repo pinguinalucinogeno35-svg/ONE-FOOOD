@@ -86,6 +86,7 @@ apps/e2e        Testes de ponta a ponta das telas (Playwright)
 packages/shared Tipos e validações compartilhados entre backend e web; dinheiro em centavos
 db/migrations   Migrações SQL, aplicadas em ordem por `pnpm db:migrate`
 infra/pgbouncer PgBouncer em modo transação, igual ao de produção
+infra/railway   Ambiente de demonstração: um arquivo de configuração por serviço
 loadtest        Teste de carga da criação de pedidos (k6)
 ```
 
@@ -279,10 +280,29 @@ k6 run -e RATE=150 loadtest/orders.js
 `RATE=50` é a meta do plano (50 pedidos por segundo por 10 minutos) e `RATE=150` é o critério de saída de fase.
 O teste só vale como critério quando roda contra o ambiente de homologação, não contra a máquina local.
 
+## Ambiente de demonstração
+
+Um ambiente na internet para abrir o sistema e clicar, publicado de novo a cada merge no `main`. A receita
+está em [`infra/railway`](infra/railway/README.md): seis serviços (site, API, workers, tempo real, Postgres
+e Redis), as variáveis de cada um e o que roda a cada publicação.
+
+- **Duas imagens.** `Dockerfile` serve aos três processos do backend e ao passo de publicação;
+  `Dockerfile.web` é o site.
+- **Passo de publicação.** `node dist/release.js` roda antes de a versão nova subir: aplica as migrações e,
+  onde houver `DATABASE_ADMIN_URL`, prepara um banco novo (papel dono, banco e login dos papéis da
+  aplicação, com as senhas das URLs de conexão). Pode rodar a cada publicação sem efeito colateral.
+- **Loja de demonstração.** Com `DEMO_OWNER_EMAIL` e `DEMO_OWNER_PASSWORD`, o mesmo passo cria a loja `/demo`
+  com cardápio, o cupom `BEMVINDO10`, um entregador e a conta do dono. Ela nasce pelos mesmos serviços do
+  cadastro de verdade e, se já existe, fica como está.
+- **Conferência.** `pnpm --filter @onefood/e2e test:demo` abre o endereço publicado num navegador: o dono
+  entra, um cliente pede e o pedido precisa chegar ao painel sem recarregar.
+
+Não é a topologia de produção: um Postgres só, sem réplica nem PgBouncer, e um Redis para filas e cache.
+
 ## O que ainda não está aqui
 
-- **Infraestrutura como código e deploy.** Dependem da escolha do provedor de nuvem, que o plano deixa em
-  cotação. A imagem do backend (`Dockerfile`) já serve aos três processos e às migrações.
+- **Infraestrutura de produção.** Depende da escolha do provedor de nuvem, que o plano deixa em cotação.
+  O ambiente de demonstração não decide isso: as imagens e o passo de publicação servem a qualquer provedor.
 - **Confirmação de e-mail, recuperação de senha e convite de equipe.** Dependem de um provedor de e-mail.
   Os papéis gerente e funcionário já existem no banco, mas só o dono é criado pelo cadastro.
 - **Dois fatores para donos.** Previsto no plano, ainda não implementado.

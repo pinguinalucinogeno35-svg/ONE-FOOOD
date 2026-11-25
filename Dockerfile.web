@@ -1,0 +1,30 @@
+# Imagem do site (Next.js). O site fala com a API pelo endereço em API_URL, lido na subida:
+# a mesma imagem serve qualquer ambiente.
+
+FROM node:22-slim AS build
+ENV PNPM_HOME=/pnpm PATH=/pnpm:$PATH NEXT_TELEMETRY_DISABLED=1
+RUN corepack enable
+WORKDIR /repo
+
+# Só os manifestos primeiro: a camada de dependências só é refeita quando eles mudam.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY packages/shared/package.json packages/shared/
+COPY apps/web/package.json apps/web/
+RUN pnpm install --frozen-lockfile --filter @onefood/web...
+
+COPY tsconfig.base.json ./
+COPY packages/shared packages/shared
+COPY apps/web apps/web
+# Saída autônoma: um servidor Node com só os arquivos de que precisa (ver next.config.ts).
+RUN NEXT_OUTPUT=standalone pnpm --filter @onefood/web... build
+
+FROM node:22-slim
+# HOSTNAME: sem ele o servidor escutaria só no nome do contêiner.
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3100 HOSTNAME=0.0.0.0
+WORKDIR /app
+# O usuário node é dono dos arquivos porque o cache do cardápio é gravado em .next/cache.
+COPY --from=build --chown=node:node /repo/apps/web/.next/standalone ./
+COPY --from=build --chown=node:node /repo/apps/web/.next/static ./apps/web/.next/static
+USER node
+EXPOSE 3100
+CMD ["node", "apps/web/server.js"]

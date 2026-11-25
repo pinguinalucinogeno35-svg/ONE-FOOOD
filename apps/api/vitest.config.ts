@@ -9,6 +9,8 @@ const env = {
   DATABASE_URL: 'postgres://onefood_app:dev_app@127.0.0.1:6432/onefood_test',
   DATABASE_RELAY_URL: 'postgres://onefood_relay:dev_relay@127.0.0.1:6432/onefood_test',
   DATABASE_MIGRATION_URL: 'postgres://onefood_owner:dev_owner@127.0.0.1:5432/onefood_test',
+  // Superusuário do Postgres local: só o teste de preparo de ambiente novo usa.
+  DATABASE_ADMIN_URL: 'postgres://postgres:postgres@127.0.0.1:5432/postgres',
   REDIS_QUEUE_URL: 'redis://127.0.0.1:6379/2',
   REDIS_CACHE_URL: 'redis://127.0.0.1:6379/3',
   REALTIME_TOKEN_SECRET: 'segredo-somente-para-os-testes-automatizados',
