@@ -22,7 +22,12 @@ export interface CourierIdentity {
   storeName: string;
 }
 
-const COLUMNS: Record<keyof UpdateCourierInput, string> = { name: 'name', phone: 'phone', active: 'active' };
+const COLUMNS: Record<keyof UpdateCourierInput, string> = {
+  name: 'name',
+  phone: 'phone',
+  active: 'active',
+  feePerDeliveryCents: 'fee_per_delivery_cents',
+};
 
 /**
  * Cadastro dos entregadores, link de acesso e última posição.
@@ -41,12 +46,19 @@ export class CouriersService {
 
   async list(tenantId: string): Promise<CourierView[]> {
     const { rows } = await this.db.withTenant(tenantId, (tx) =>
-      tx.query<CourierView>(
-        'SELECT id, name, phone, active FROM couriers WHERE tenant_id = $1 ORDER BY active DESC, name',
+      tx.query<{ id: string; name: string; phone: string; active: boolean; fee_per_delivery_cents: number | null }>(
+        `SELECT id, name, phone, active, fee_per_delivery_cents
+           FROM couriers WHERE tenant_id = $1 ORDER BY active DESC, name`,
         [tenantId],
       ),
     );
-    return rows;
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      phone: row.phone,
+      active: row.active,
+      feePerDeliveryCents: row.fee_per_delivery_cents,
+    }));
   }
 
   async create(tenantId: string, input: CreateCourierInput): Promise<CourierAccessView> {
@@ -54,13 +66,11 @@ export class CouriersService {
     const accessToken = newToken();
     try {
       await this.db.withTenant(tenantId, (tx) =>
-        tx.query('INSERT INTO couriers (tenant_id, id, name, phone, access_token_hash) VALUES ($1, $2, $3, $4, $5)', [
-          tenantId,
-          id,
-          input.name,
-          input.phone,
-          hashToken(accessToken),
-        ]),
+        tx.query(
+          `INSERT INTO couriers (tenant_id, id, name, phone, access_token_hash, fee_per_delivery_cents)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [tenantId, id, input.name, input.phone, hashToken(accessToken), input.feePerDeliveryCents],
+        ),
       );
     } catch (error) {
       throw phoneTaken(error);
@@ -135,6 +145,25 @@ export class CouriersService {
       [tx.tenantId, ids],
     );
     return new Map(rows.map((row) => [row.id, row.name]));
+  }
+
+  /**
+   * Nome e regra de pagamento dos entregadores, para o acerto. Com `lock`, trava as linhas até
+   * o fim da transação: o valor por entrega não muda no meio de um fechamento.
+   */
+  async payRules(
+    tx: TenantTx,
+    courierIds: string[],
+    lock = false,
+  ): Promise<Map<string, { name: string; feePerDeliveryCents: number | null }>> {
+    const ids = [...new Set(courierIds)];
+    if (ids.length === 0) return new Map();
+    const { rows } = await tx.query<{ id: string; name: string; fee_per_delivery_cents: number | null }>(
+      `SELECT id, name, fee_per_delivery_cents FROM couriers
+        WHERE tenant_id = $1 AND id = ANY($2::uuid[]) ${lock ? 'FOR UPDATE' : ''}`,
+      [tx.tenantId, ids],
+    );
+    return new Map(rows.map((row) => [row.id, { name: row.name, feePerDeliveryCents: row.fee_per_delivery_cents }]));
   }
 
   async savePosition(tenantId: string, courierId: string, input: CourierPositionInput): Promise<void> {

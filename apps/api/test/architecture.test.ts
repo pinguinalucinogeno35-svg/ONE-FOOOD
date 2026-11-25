@@ -66,6 +66,7 @@ describe('fronteiras do monólito modular', () => {
       customers: 'orders',
       outbox: 'outbox',
       couriers: 'delivery',
+      courier_settlements: 'orders',
       coupons: 'coupons',
       coupon_redemptions: 'coupons',
       order_reviews: 'orders',

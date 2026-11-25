@@ -82,6 +82,52 @@ export async function createStore(): Promise<Store> {
   return { ...store, storageState };
 }
 
+/** Chamadas à API como o dono da loja, para preparar um cenário sem passar pelas telas. */
+export async function panelApi(store: Store) {
+  const api = await playwrightRequest.newContext({ baseURL: WEB_URL, storageState: store.storageState });
+  const call = async <T>(method: 'get' | 'post' | 'patch', path: string, data?: unknown): Promise<T> => {
+    const response = await api[method](`/api/v1/panel/stores/${store.slug}${path}`, { data });
+    expect(response.ok(), `${method.toUpperCase()} ${path}: ${response.status()} ${await response.text()}`).toBe(true);
+    return (response.status() === 204 ? {} : await response.json()) as T;
+  };
+  return { call, dispose: () => api.dispose() };
+}
+
+/**
+ * Faz um pedido de entrega de um refrigerante (7,00 mais 6,00 de entrega) direto pela API
+ * pública e devolve o id.
+ */
+export async function placeDeliveryByApi(store: Store, paymentMethod: 'cash' | 'card_on_delivery'): Promise<string> {
+  const api = await playwrightRequest.newContext({ baseURL: WEB_URL });
+  const menu = (await (await api.get(`/api/v1/stores/${store.slug}/menu`)).json()) as {
+    categories: Array<{ products: Array<{ id: string; name: string }> }>;
+  };
+  const product = menu.categories
+    .flatMap((category) => category.products)
+    .find((item) => item.name === 'Refrigerante lata');
+  const response = await api.post(`/api/v1/stores/${store.slug}/orders`, {
+    headers: { 'idempotency-key': `e2e-${unique()}` },
+    data: {
+      customer: { name: 'Carlos Lima', phone: `+55119${Math.floor(10000000 + Math.random() * 89999999)}` },
+      fulfillment: 'delivery',
+      paymentMethod,
+      items: [{ productId: product?.id, quantity: 1 }],
+      deliveryAddress: {
+        street: 'Rua das Flores',
+        number: '120',
+        district: 'Centro',
+        city: 'Campinas',
+        state: 'SP',
+        postalCode: '13010000',
+      },
+    },
+  });
+  expect(response.status(), await response.text()).toBe(201);
+  const order = (await response.json()) as { id: string };
+  await api.dispose();
+  return order.id;
+}
+
 /** O painel do restaurante, já logado como dono. */
 export async function openPanel(browser: Browser, store: Store, section = 'pedidos'): Promise<Page> {
   const context = await browser.newContext({

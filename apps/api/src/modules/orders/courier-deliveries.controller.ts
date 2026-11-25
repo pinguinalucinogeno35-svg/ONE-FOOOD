@@ -2,13 +2,17 @@ import { Body, Controller, Get, HttpCode, Inject, Param, Post, UseGuards } from 
 import { type CourierHomeView, courierStatusSchema } from '@onefood/shared';
 import { parseBody } from '../../platform/http/validation.js';
 import { CourierGuard, type CourierIdentity, CurrentCourier } from '../delivery/index.js';
+import { CourierSettlementsService } from './courier-settlements.service.js';
 import { PanelOrdersService } from './panel-orders.service.js';
 
 /** O que o entregador faz pelo link pessoal: ver as próprias entregas e avisar que saiu e que entregou. */
 @Controller('v1/courier')
 @UseGuards(CourierGuard)
 export class CourierDeliveriesController {
-  constructor(@Inject(PanelOrdersService) private readonly orders: PanelOrdersService) {}
+  constructor(
+    @Inject(PanelOrdersService) private readonly orders: PanelOrdersService,
+    @Inject(CourierSettlementsService) private readonly settlements: CourierSettlementsService,
+  ) {}
 
   @Get('deliveries')
   async home(@CurrentCourier() courier: CourierIdentity): Promise<CourierHomeView> {
@@ -16,6 +20,7 @@ export class CourierDeliveriesController {
       courier: { name: courier.name },
       store: { name: courier.storeName },
       deliveries: await this.orders.listForCourier(courier.tenantId, courier.courierId),
+      settlement: await this.settlements.pendingFor(courier.tenantId, courier.courierId),
     };
   }
 

@@ -5,6 +5,8 @@ import { DeliveryModule } from '../delivery/index.js';
 import { IdentityModule } from '../identity/index.js';
 import { OutboxModule } from '../outbox/index.js';
 import { CourierDeliveriesController } from './courier-deliveries.controller.js';
+import { CourierSettlementsController } from './courier-settlements.controller.js';
+import { CourierSettlementsService } from './courier-settlements.service.js';
 import { OrdersController } from './orders.controller.js';
 import { OrdersService } from './orders.service.js';
 import { PanelOrdersController } from './panel-orders.controller.js';
@@ -20,8 +22,9 @@ import { ReviewsService } from './reviews.service.js';
     ReviewsController,
     PanelReviewsController,
     CourierDeliveriesController,
+    CourierSettlementsController,
   ],
-  providers: [OrdersService, PanelOrdersService, ReviewsService],
+  providers: [OrdersService, PanelOrdersService, ReviewsService, CourierSettlementsService],
   exports: [OrdersService],
 })
 export class OrdersModule {}

@@ -2,14 +2,23 @@ import { z } from 'zod';
 import type { DeliveryAddress, OrderStatus, PaymentMethod } from './orders.js';
 import { phoneSchema } from './orders.js';
 
+/** Valor pago ao entregador por entrega. null = ele recebe a taxa de entrega de cada pedido. */
+const feePerDelivery = z.number().int().min(0).max(1_000_00).nullable();
+
 export const createCourierSchema = z.object({
   name: z.string().trim().min(1).max(120),
   phone: phoneSchema,
+  feePerDeliveryCents: feePerDelivery.default(null),
 });
 export type CreateCourierInput = z.infer<typeof createCourierSchema>;
 
 export const updateCourierSchema = z
-  .object({ name: z.string().trim().min(1).max(120), phone: phoneSchema, active: z.boolean() })
+  .object({
+    name: z.string().trim().min(1).max(120),
+    phone: phoneSchema,
+    active: z.boolean(),
+    feePerDeliveryCents: feePerDelivery,
+  })
   .partial()
   .refine((patch) => Object.keys(patch).length > 0, 'nada para alterar');
 export type UpdateCourierInput = z.infer<typeof updateCourierSchema>;
@@ -33,6 +42,7 @@ export interface CourierView {
   name: string;
   phone: string;
   active: boolean;
+  feePerDeliveryCents: number | null;
 }
 
 /** Devolvido só na criação e na troca do link: o token não fica guardado em lugar nenhum. */
@@ -65,6 +75,50 @@ export interface CourierHomeView {
   courier: { name: string };
   store: { name: string };
   deliveries: CourierDeliveryView[];
+  /** O que está pendente de acerto com o restaurante. */
+  settlement: SettlementTotals;
+}
+
+/** Totais de um acerto, pendente ou já fechado. */
+export interface SettlementTotals {
+  deliveries: number;
+  /** A pagar ao entregador pelas entregas. */
+  feesCents: number;
+  /** Dinheiro que o entregador recebeu dos clientes. */
+  cashCents: number;
+}
+
+/**
+ * Saldo do acerto. Positivo: o entregador repassa ao restaurante. Negativo: o restaurante
+ * paga ao entregador.
+ */
+export function settlementNetCents(totals: SettlementTotals): number {
+  return totals.cashCents - totals.feesCents;
+}
+
+export const closeSettlementSchema = z.object({
+  courierId: z.uuid(),
+  note: z.string().trim().max(300).optional(),
+});
+
+export interface PendingSettlementView extends SettlementTotals {
+  courierId: string;
+  courierName: string;
+  /** Data da entrega mais antiga ainda não acertada. */
+  since: string;
+}
+
+export interface ClosedSettlementView extends SettlementTotals {
+  id: string;
+  courierId: string;
+  courierName: string;
+  createdAt: string;
+  note: string | null;
+}
+
+export interface SettlementsView {
+  pending: PendingSettlementView[];
+  recent: ClosedSettlementView[];
 }
 
 /** O que o cliente vê do entregador: primeiro nome e, durante a entrega, onde ele está. */

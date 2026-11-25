@@ -142,6 +142,8 @@ Painel do restaurante, em `/v1/panel/stores/:slug` (exige sessão e vínculo com
 | `POST /couriers/:id/access-token`                        | Troca o link pessoal do entregador                  | dono, gerente                      |
 | `POST /orders/:id/courier`                               | Define ou retira o entregador do pedido             | todos                              |
 | `POST /orders/:id/printed`                               | Registra que o pedido foi impresso                  | todos                              |
+| `GET /courier-settlements`                               | Acerto pendente por entregador e últimos acertos    | todos                              |
+| `POST /courier-settlements`                              | Fecha o acerto de um entregador                     | dono, gerente                      |
 
 Estados do pedido: `pending` → `confirmed` → `preparing` → `ready` → `completed`. Pedido de entrega passa por
 `out_for_delivery` antes de concluir. Qualquer estado em aberto pode ir para `cancelled`.
@@ -189,8 +191,12 @@ Entregador, em `/v1/courier` (exige o token do link pessoal em `Authorization: B
 - **O entregador decide compartilhar.** A localização só é enviada depois que ele liga, na página dele.
 - **Mapa.** O site usa Leaflet com o servidor público do OpenStreetMap, que serve para desenvolvimento e
   demonstração. Em produção, contrate um provedor de mapas e aponte `NEXT_PUBLIC_MAP_TILES_URL` para ele.
-- **Fora desta entrega:** rotas, acerto de taxas e dinheiro com o entregador, e aviso ao entregador por WhatsApp
-  quando um pedido é atribuído.
+- **Acerto.** Para cada entregador, o painel soma as entregas concluídas ainda não acertadas: o que ele tem a
+  receber (o valor por entrega do cadastro ou, sem ele, a taxa de entrega de cada pedido) e o dinheiro que
+  recebeu em mãos dos clientes. Cartão na entrega e Pix caem direto para o restaurante e não entram.
+- **Fechar o acerto** grava os totais como estavam, marca as entregas como acertadas e entra no histórico.
+  Mudar depois o valor por entrega não reescreve acertos fechados. O entregador vê a mesma conta na página dele.
+- **Fora desta entrega:** rotas e aviso ao entregador por WhatsApp quando um pedido é atribuído.
 
 ## Impressão de pedidos
 
